@@ -12,7 +12,7 @@ impl LoaderLifecycleState {
         LoaderLifecycleState { execution_paths }
     }
 }
-
+#[link(name = "metacall")]
 extern "C" {
     fn loader_impl_get(loader_impl: *mut c_void) -> *mut c_void;
 

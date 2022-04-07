@@ -30,6 +30,7 @@ BUILD_NETCORE5=0
 BUILD_V8=0
 BUILD_NODEJS=0
 BUILD_TYPESCRIPT=0
+BUILD_RUST=0
 BUILD_FILE=0
 BUILD_RPC=0
 BUILD_SCRIPTS=0
@@ -127,6 +128,10 @@ sub_options() {
 		if [ "$option" = 'sanitizer' ]; then
 			echo "Build with sanitizers"
 			BUILD_SANITIZER=1
+		fi
+		if [ "$option" = 'rust' ]; then
+			echo "Build with rust support"
+			BUILD_RUST=1
 		fi
 	done
 }
@@ -313,6 +318,19 @@ sub_configure() {
 		BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_SANITIZER=On -DOPTION_BUILD_BACKTRACE=Off"
 	else
 		BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_SANITIZER=Off"
+	fi
+
+	# Rust
+	if [ $BUILD_RUST = 1 ]; then
+		BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_LOADERS_RS=On"
+
+		if [ $BUILD_SCRIPTS = 1 ]; then
+			BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_SCRIPTS_RS=On"
+		fi
+
+		if [ $BUILD_PORTS = 1 ]; then
+			BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_PORTS_RS=On"
+		fi
 	fi
 
 	# Build type
