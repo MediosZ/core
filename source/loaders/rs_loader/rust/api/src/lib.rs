@@ -1,8 +1,9 @@
 use std::{
     ffi::{c_void, CString},
-    os::raw::{c_char, c_int},
-    path::PathBuf,
+    os::raw::{c_char, c_int, c_float},
+    path::PathBuf, boxed,
 };
+use libffi::low::{CodePtr, types, ffi_cif, ffi_type, prep_cif, call, ffi_abi_FFI_DEFAULT_ABI};
 
 pub struct LoaderLifecycleState {
     pub execution_paths: Vec<PathBuf>,
@@ -12,7 +13,7 @@ impl LoaderLifecycleState {
         LoaderLifecycleState { execution_paths }
     }
 }
-#[link(name = "metacall")]
+// #[link(name = "metacall")]
 extern "C" {
     fn loader_impl_get(loader_impl: *mut c_void) -> *mut c_void;
 
@@ -57,10 +58,27 @@ extern "C" {
     fn loader_impl_type(loader_impl: *mut c_void, name: *const c_char) -> *mut c_void;
 
     fn scope_define(scope: *mut c_void, key: *mut c_char, value: *mut c_void) -> c_int;
+
+    fn call_from_rs(cb: extern fn(i32));
+
+    fn pass_object(book: *mut Book, des: extern fn(*mut c_void));
+}
+
+pub fn call_from_rs2(cb: extern fn(i32)){
+    unsafe { call_from_rs(cb); }
+}
+
+extern fn destroy(book: *mut c_void) {
+    println!("drop book");
+    drop(unsafe { Box::from_raw(book as *mut Book) });
+}
+
+pub fn pass_object_rs(book: Book){
+    unsafe { pass_object(Box::into_raw(Box::new(book)), destroy); }
 }
 
 #[repr(C)]
-struct FunctionInterface {
+pub struct FunctionInterface {
     create: extern "C" fn(*mut c_void, *mut c_void) -> c_int,
     invoke: extern "C" fn(*mut c_void, *mut c_void, *mut *mut c_void, usize) -> *mut c_void,
     r#await: extern "C" fn(
@@ -76,17 +94,71 @@ struct FunctionInterface {
 }
 
 #[no_mangle]
-extern "C" fn function_singleton_create(_func: *mut c_void, _func_impl: *mut c_void) -> c_int {
+extern "C" fn function_singleton_create(_func: *mut c_void, func_impl: *mut c_void) -> c_int {
+    println!("create function!");
+    println!("is_null {}", func_impl.is_null());
+    println!("{:p}", func_impl);
+
+    unsafe {
+        //prepare rust args
+        let mut args: Vec<*mut ffi_type> = vec![ &mut types::sint32,
+                                                &mut types::sint32 ];
+        let mut cif: ffi_cif = Default::default();
+        prep_cif(&mut cif, ffi_abi_FFI_DEFAULT_ABI, 2,
+                &mut types::sint32, args.as_mut_ptr()).unwrap();
+        // let libffi_func: Box<CodePtr> = std::mem::transmute(func_impl);
+        let boxed_func_impl = Box::from_raw(func_impl as *mut CodePtr);
+        println!("{:?}", *boxed_func_impl);
+        println!("before call");
+        let result: i32 = call(&mut cif, 
+            *boxed_func_impl, 
+            vec![ &mut 5i32 as *mut _ as *mut c_void, &mut 6i32 as *mut _ as *mut c_void ].as_mut_ptr()
+        );
+
+        println!("after call");
+        println!("get result: {}", result);
+        std::mem::forget(boxed_func_impl);
+    };
+
+    // let test_func: fn(i32, i32)->i32 = unsafe {std::mem::transmute_copy(&(func_impl as *const c_void)) };
+    // println!("test: {}", test_func(1, 5));
     0
 }
 
 #[no_mangle]
 extern "C" fn function_singleton_invoke(
     _func: *mut c_void,
-    _func_impl: *mut c_void,
+    func_impl: *mut c_void,
     _args: *mut *mut c_void,
-    _size: usize,
+    size: usize,
 ) -> *mut c_void {
+    println!("invoke function!");
+    println!("is_null {}", func_impl.is_null());
+    println!("{:p}", func_impl);
+
+    unsafe {
+        //prepare rust args
+        let mut args: Vec<*mut ffi_type> = vec![ &mut types::sint32,
+                                                &mut types::sint32 ];
+        let mut cif: ffi_cif = Default::default();
+        prep_cif(&mut cif, ffi_abi_FFI_DEFAULT_ABI, 2,
+                &mut types::sint32, args.as_mut_ptr()).unwrap();
+        // let libffi_func: Box<CodePtr> = std::mem::transmute(func_impl);
+        let boxed_func_impl = Box::from_raw(func_impl as *mut CodePtr);
+        println!("{:?}", *boxed_func_impl);
+        println!("before call");
+        let result: i32 = call(&mut cif, 
+            *boxed_func_impl, 
+            vec![ &mut 5i32 as *mut _ as *mut c_void, &mut 6i32 as *mut _ as *mut c_void ].as_mut_ptr()
+        );
+
+        println!("after call");
+        println!("get result: {}", result);
+        std::mem::forget(boxed_func_impl);
+    };
+
+
+
     // func is of type function found here: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/reflect/include/reflect/reflect_function.h#L65
     // func_impl is of type: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/loaders/rs_loader/rust/compiler/src/registrator.rs#L19
     // args is an array of 'value' of size 'size', you can iterate over it and get the C value representation
@@ -112,16 +184,22 @@ extern "C" fn function_singleton_await(
     _reject: extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void,
     _data: *mut c_void,
 ) -> *mut c_void {
+    println!("await function!");
     0 as *mut c_void
 }
 
 #[no_mangle]
-extern "C" fn function_singleton_destroy(_func: *mut c_void, _func_impl: *mut c_void) {
+extern "C" fn function_singleton_destroy(_func: *mut c_void, func_impl: *mut c_void) {
+    println!("destroy function!");
+    // println!("is_null {}", func_impl.is_null());
+    // println!("{:p}", func_impl);
+    // let test_func: fn(i32, i32)->i32 = unsafe {std::mem::transmute_copy(&(func_impl as *const c_void)) };
+    // println!("test: {}", test_func(1, 5));
     // Here we have to free the memory of this: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/loaders/rs_loader/rust/compiler/src/registrator.rs#L19
 }
 
 #[no_mangle]
-extern "C" fn function_singleton() -> *const FunctionInterface {
+pub extern "C" fn function_singleton() -> *const FunctionInterface {
     static SINGLETON: FunctionInterface = FunctionInterface {
         create: function_singleton_create,
         invoke: function_singleton_invoke,

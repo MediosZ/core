@@ -334,7 +334,7 @@ sub_configure() {
 	fi
 
 	# Build type
-	BUILD_STRING="$BUILD_STRING -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
+	BUILD_STRING="$BUILD_STRING -DCMAKE_INSTALL_PREFIX=/home/tric/codebase/gnu -DCMAKE_BUILD_TYPE=$BUILD_TYPE"
 
 	# Execute CMake
 	cmake -Wno-dev -DOPTION_GIT_HOOKS=Off $BUILD_STRING ..
