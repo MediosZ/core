@@ -1,9 +1,10 @@
 use std::{
     ffi::{c_void, CString},
-    os::raw::{c_char, c_int, c_float},
+    os::raw::{c_char, c_double, c_float, c_int, c_long, c_short},
     path::PathBuf, boxed,
 };
 use libffi::low::{CodePtr, types, ffi_cif, ffi_type, prep_cif, call, ffi_abi_FFI_DEFAULT_ABI};
+use dlopen::raw::Library as DlopenLibrary;
 
 pub struct LoaderLifecycleState {
     pub execution_paths: Vec<PathBuf>,
@@ -13,7 +14,11 @@ impl LoaderLifecycleState {
         LoaderLifecycleState { execution_paths }
     }
 }
-// #[link(name = "metacall")]
+pub struct Payload{
+    pub number: i32,
+    pub func: Box<*mut c_void>,
+}
+
 extern "C" {
     fn loader_impl_get(loader_impl: *mut c_void) -> *mut c_void;
 
@@ -59,22 +64,6 @@ extern "C" {
 
     fn scope_define(scope: *mut c_void, key: *mut c_char, value: *mut c_void) -> c_int;
 
-    fn call_from_rs(cb: extern fn(i32));
-
-    fn pass_object(book: *mut Book, des: extern fn(*mut c_void));
-}
-
-pub fn call_from_rs2(cb: extern fn(i32)){
-    unsafe { call_from_rs(cb); }
-}
-
-extern fn destroy(book: *mut c_void) {
-    println!("drop book");
-    drop(unsafe { Box::from_raw(book as *mut Book) });
-}
-
-pub fn pass_object_rs(book: Book){
-    unsafe { pass_object(Box::into_raw(Box::new(book)), destroy); }
 }
 
 #[repr(C)]
@@ -96,32 +85,6 @@ pub struct FunctionInterface {
 #[no_mangle]
 extern "C" fn function_singleton_create(_func: *mut c_void, func_impl: *mut c_void) -> c_int {
     println!("create function!");
-    println!("is_null {}", func_impl.is_null());
-    println!("{:p}", func_impl);
-
-    unsafe {
-        //prepare rust args
-        let mut args: Vec<*mut ffi_type> = vec![ &mut types::sint32,
-                                                &mut types::sint32 ];
-        let mut cif: ffi_cif = Default::default();
-        prep_cif(&mut cif, ffi_abi_FFI_DEFAULT_ABI, 2,
-                &mut types::sint32, args.as_mut_ptr()).unwrap();
-        // let libffi_func: Box<CodePtr> = std::mem::transmute(func_impl);
-        let boxed_func_impl = Box::from_raw(func_impl as *mut CodePtr);
-        println!("{:?}", *boxed_func_impl);
-        println!("before call");
-        let result: i32 = call(&mut cif, 
-            *boxed_func_impl, 
-            vec![ &mut 5i32 as *mut _ as *mut c_void, &mut 6i32 as *mut _ as *mut c_void ].as_mut_ptr()
-        );
-
-        println!("after call");
-        println!("get result: {}", result);
-        std::mem::forget(boxed_func_impl);
-    };
-
-    // let test_func: fn(i32, i32)->i32 = unsafe {std::mem::transmute_copy(&(func_impl as *const c_void)) };
-    // println!("test: {}", test_func(1, 5));
     0
 }
 
@@ -129,32 +92,43 @@ extern "C" fn function_singleton_create(_func: *mut c_void, func_impl: *mut c_vo
 extern "C" fn function_singleton_invoke(
     _func: *mut c_void,
     func_impl: *mut c_void,
-    _args: *mut *mut c_void,
+    args_p: *mut *mut c_void,
     size: usize,
 ) -> *mut c_void {
     println!("invoke function!");
-    println!("is_null {}", func_impl.is_null());
-    println!("{:p}", func_impl);
-
+    // unsafe {
+    //     let payload = Box::from_raw(func_impl as *mut Payload);
+    //     let test_func: fn(i32, i32)->i32 = std::mem::transmute_copy(&(*payload.func));
+    //     println!("test: {}", test_func(1, 5));
+    //     std::mem::forget(payload);
+    // }
+    // unsafe {
+    //     let boxed_func_impl = Box::from_raw(func_impl as *mut CodePtr);
+    //     let test_func: fn(i32, i32)->i32 = std::mem::transmute_copy(&(boxed_func_impl.0));
+    //     println!("test: {}", test_func(1, 5));
+    //     std::mem::forget(boxed_func_impl);
+    // }
     unsafe {
+        let payload = Box::from_raw(func_impl as *mut Payload);
         //prepare rust args
         let mut args: Vec<*mut ffi_type> = vec![ &mut types::sint32,
                                                 &mut types::sint32 ];
         let mut cif: ffi_cif = Default::default();
-        prep_cif(&mut cif, ffi_abi_FFI_DEFAULT_ABI, 2,
+        prep_cif(&mut cif, ffi_abi_FFI_DEFAULT_ABI, size,
                 &mut types::sint32, args.as_mut_ptr()).unwrap();
-        // let libffi_func: Box<CodePtr> = std::mem::transmute(func_impl);
-        let boxed_func_impl = Box::from_raw(func_impl as *mut CodePtr);
-        println!("{:?}", *boxed_func_impl);
-        println!("before call");
+        // let mut args: Vec<*mut c_void> = vec![];
+        // let vec = std::slice::from_raw_parts(args_p, size).to_vec();
+        // dbg!(&vec);
+        // for idx in 0..size {
+        //     args.push()
+        // }
         let result: i32 = call(&mut cif, 
-            *boxed_func_impl, 
-            vec![ &mut 5i32 as *mut _ as *mut c_void, &mut 6i32 as *mut _ as *mut c_void ].as_mut_ptr()
+            CodePtr::from_ptr(*payload.func), 
+            args_p//vec![ &mut 5i32 as *mut _ as *mut c_void, &mut 6i32 as *mut _ as *mut c_void ].as_mut_ptr()
         );
-
-        println!("after call");
-        println!("get result: {}", result);
-        std::mem::forget(boxed_func_impl);
+        std::mem::forget(payload);
+        // std::mem::forget(vec);
+        return metacall_value_create_int(result);
     };
 
 
@@ -191,10 +165,11 @@ extern "C" fn function_singleton_await(
 #[no_mangle]
 extern "C" fn function_singleton_destroy(_func: *mut c_void, func_impl: *mut c_void) {
     println!("destroy function!");
-    // println!("is_null {}", func_impl.is_null());
-    // println!("{:p}", func_impl);
-    // let test_func: fn(i32, i32)->i32 = unsafe {std::mem::transmute_copy(&(func_impl as *const c_void)) };
-    // println!("test: {}", test_func(1, 5));
+    unsafe {
+        let payload = Box::from_raw(func_impl as *mut Payload);
+        // std::mem::forget(payload);
+        drop(payload);
+    }
     // Here we have to free the memory of this: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/loaders/rs_loader/rust/compiler/src/registrator.rs#L19
 }
 

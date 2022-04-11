@@ -12,15 +12,6 @@ pub extern "C" fn rs_loader_impl_initialize(
     _config: *mut c_void,
 ) -> *mut c_void {
     let boxed_loader_lifecycle_state = Box::new(api::LoaderLifecycleState::new(Vec::new()));
-    let book = api::Book {
-        number: 123,
-        price: 123.2
-    };
-    api::pass_object_rs(book);
-    // api::call_from_rs2(callback);
-    // println!("{}", "Initialize RS loader!");
-    // api::log(String::from("initialize"));
-    // assert_eq!(1, 0);
     compiler::initialize();
     api::define_type(
         loader_impl,

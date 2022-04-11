@@ -30,6 +30,8 @@ pub extern "C" fn rs_loader_impl_discover(
               // }
         }
     }
-
+    
+    // remember to forget handle, or the DlopenLibrary will be dropped.
+    std::mem::forget(handle_shared_objects);
     0 as c_int
 }
