@@ -33,6 +33,9 @@ BUILD_TYPESCRIPT=0
 BUILD_RUST=0
 BUILD_FILE=0
 BUILD_RPC=0
+BUILD_WASM=0
+BUILD_JAVA=0
+BUILD_C=0
 BUILD_SCRIPTS=0
 BUILD_EXAMPLES=0
 BUILD_TESTS=0
@@ -100,6 +103,18 @@ sub_options() {
 		if [ "$option" = 'rpc' ]; then
 			echo "Build with rpc support"
 			BUILD_RPC=1
+		fi
+		if [ "$option" = 'wasm' ]; then
+			echo "Build with wasm support"
+			BUILD_WASM=1
+		fi
+		if [ "$option" = 'java' ]; then
+			echo "Build with java support"
+			BUILD_JAVA=1
+		fi
+		if [ "$option" = 'c' ]; then
+			echo "Build with c support"
+			BUILD_C=1
 		fi
 		if [ "$option" = 'scripts' ]; then
 			echo "Build all scripts"
@@ -276,6 +291,33 @@ sub_configure() {
 		fi
 	fi
 
+	# WebAssembly
+	if [ $BUILD_WASM = 1 ]; then
+		BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_LOADERS_WASM=On"
+
+		if [ $BUILD_SCRIPTS = 1 ]; then
+			BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_SCRIPTS_WASM=On"
+		fi
+	fi
+
+	# Java
+	if [ $BUILD_JAVA = 1 ]; then
+		BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_LOADERS_JAVA=On"
+
+		if [ $BUILD_SCRIPTS = 1 ]; then
+			BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_SCRIPTS_JAVA=On"
+		fi
+	fi
+
+	# C
+	if [ $BUILD_C = 1 ]; then
+		BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_LOADERS_C=On"
+
+		if [ $BUILD_SCRIPTS = 1 ]; then
+			BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_SCRIPTS_C=On"
+		fi
+	fi
+
 	# Examples
 	if [ $BUILD_EXAMPLES = 1 ]; then
 		BUILD_STRING="$BUILD_STRING -DOPTION_BUILD_EXAMPLES=On"
@@ -355,6 +397,9 @@ sub_help() {
 	echo "	typescript: build with typescript support"
 	echo "	file: build with file support"
 	echo "	rpc: build with rpc support"
+	echo "	wasm: build with wasm support"
+	echo "	java: build with java support"
+	echo "	c: build with c support"
 	echo "	scripts: build all scripts"
 	echo "	examples: build all examples"
 	echo "	tests: build and run all tests"
