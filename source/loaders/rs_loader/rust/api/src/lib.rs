@@ -38,6 +38,10 @@ extern "C" {
     ) -> *mut c_void;
 
     fn type_name(t: *mut c_void) -> *const c_char;
+    
+    fn value_type_id(t: *mut c_void) -> i32;
+
+    fn value_to_array(v: *mut c_void) -> *mut *mut c_void;
 
     fn function_create(
         name: *const c_char,
@@ -64,8 +68,44 @@ extern "C" {
 
     fn scope_define(scope: *mut c_void, key: *mut c_char, value: *mut c_void) -> c_int;
 
+    pub fn metacall_value_id(v: *mut c_void) -> c_int;
+    pub fn metacall_value_to_int(v: *mut c_void) -> c_int;
+    pub fn metacall_value_to_bool(v: *mut c_void) -> c_int;
+    pub fn metacall_value_to_char(v: *mut c_void) -> c_char;
+    pub fn metacall_value_to_long(v: *mut c_void) -> c_long;
+    pub fn metacall_value_to_short(v: *mut c_void) -> c_short;
+    pub fn metacall_value_to_float(v: *mut c_void) -> c_float;
+    pub fn metacall_value_to_double(v: *mut c_void) -> c_double;
+    pub fn metacall_value_to_array(v: *mut c_void) -> *mut *mut c_void;
+    pub fn metacall_value_to_ptr(v: *mut c_void) -> *mut c_void;
+    pub fn metacall_function(cfn: *const c_char) -> *mut c_void;
+    pub fn metacall_value_create_int(i: c_int) -> *mut c_void;
+    pub fn metacall_value_create_bool(b: c_int) -> *mut c_void;
+    pub fn metacall_value_create_long(l: c_long) -> *mut c_void;
+    pub fn metacall_value_create_char(st: c_char) -> *mut c_void;
+    pub fn metacall_value_create_short(s: c_short) -> *mut c_void;
+    pub fn metacall_value_create_float(f: c_float) -> *mut c_void;
+    pub fn metacall_value_to_string(v: *mut c_void) -> *mut c_char;
+    pub fn metacall_value_create_double(d: c_double) -> *mut c_void;
+    pub fn metacall_value_create_string(st: *const c_char, ln: usize) -> *mut c_void;
 }
 
+fn handle_typeid(id: i32) -> ffi_type {
+    unsafe {
+        match id  {
+            0 => types::void,
+            1 => types::uint8,
+            2 => types::sint16,
+            3 => types::sint32,
+            4 => types::sint64,
+            5 => types::float,
+            6 => types::double,
+            14 => types::void,
+            _ => types::pointer,
+        }
+    }
+
+}
 #[repr(C)]
 pub struct FunctionInterface {
     create: extern "C" fn(*mut c_void, *mut c_void) -> c_int,
@@ -96,40 +136,7 @@ extern "C" fn function_singleton_invoke(
     size: usize,
 ) -> *mut c_void {
     println!("invoke function!");
-    // unsafe {
-    //     let payload = Box::from_raw(func_impl as *mut Payload);
-    //     let test_func: fn(i32, i32)->i32 = std::mem::transmute_copy(&(*payload.func));
-    //     println!("test: {}", test_func(1, 5));
-    //     std::mem::forget(payload);
-    // }
-    // unsafe {
-    //     let boxed_func_impl = Box::from_raw(func_impl as *mut CodePtr);
-    //     let test_func: fn(i32, i32)->i32 = std::mem::transmute_copy(&(boxed_func_impl.0));
-    //     println!("test: {}", test_func(1, 5));
-    //     std::mem::forget(boxed_func_impl);
-    // }
-    unsafe {
-        let payload = Box::from_raw(func_impl as *mut Payload);
-        //prepare rust args
-        let mut args: Vec<*mut ffi_type> = vec![ &mut types::sint32,
-                                                &mut types::sint32 ];
-        let mut cif: ffi_cif = Default::default();
-        prep_cif(&mut cif, ffi_abi_FFI_DEFAULT_ABI, size,
-                &mut types::sint32, args.as_mut_ptr()).unwrap();
-        // let mut args: Vec<*mut c_void> = vec![];
-        // let vec = std::slice::from_raw_parts(args_p, size).to_vec();
-        // dbg!(&vec);
-        // for idx in 0..size {
-        //     args.push()
-        // }
-        let result: i32 = call(&mut cif, 
-            CodePtr::from_ptr(*payload.func), 
-            args_p//vec![ &mut 5i32 as *mut _ as *mut c_void, &mut 6i32 as *mut _ as *mut c_void ].as_mut_ptr()
-        );
-        std::mem::forget(payload);
-        // std::mem::forget(vec);
-        return metacall_value_create_int(result);
-    };
+    println!("get {} args", size);
 
 
 

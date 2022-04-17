@@ -14,7 +14,9 @@ extern crate rustc_interface;
 extern crate rustc_session;
 extern crate rustc_span;
 
-use rustc_ast::{visit, NodeId};
+use rustc_hir::MutTy;
+use rustc_hir::{FnSig, TyKind, QPath, def::Res, PrimTy, FnRetTy, Ty, GenericArg};
+use rustc_ast::{visit, NodeId, IntTy, FloatTy, UintTy};
 use rustc_interface::{interface::Compiler, Config, Queries};
 use rustc_session::config;
 use rustc_session::config::CrateType;
@@ -22,10 +24,13 @@ use rustc_span::source_map;
 use rustc_span::Span;
 
 use std::{path::PathBuf, sync};
-
+use std::fmt;
 pub mod file;
 pub mod package;
 pub(crate) mod registrator;
+pub mod wrapper;
+
+use wrapper::generate_wrapper;
 
 pub enum RegistrationError {
     CompilationError(String),
@@ -179,12 +184,59 @@ pub struct FunctionType {
 }
 
 impl FunctionType {
-    fn new(ty: &rustc_ast::ptr::P<rustc_ast::ast::Ty>) -> FunctionType {
-        FunctionType {
+    fn new(ty: &rustc_ast::ptr::P<rustc_ast::ast::Ty>) -> Self {
+        Self {
             name: rustc_ast_pretty::pprust::ty_to_string(&ty),
             // ty: ty.into_inner().clone(),
         }
     }
+}
+#[derive(Clone, Debug)]
+pub enum Mutability{
+    Yes,
+    No
+}
+#[derive(Clone, Debug)]
+pub enum Reference {
+    Yes,
+    No
+}
+
+
+#[derive(Clone, Debug)]
+pub enum FunctionType2{
+    I16,
+    I32, 
+    I64,
+    U16,
+    U32,
+    U64,
+    F32,
+    F64,
+    Bool,
+    Char, 
+    Array,
+    Slice,
+    Str,
+    Ptr,
+    Null,
+    Complex
+}
+
+impl fmt::Display for FunctionType2 {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.write_str(format!("{:?}", self).as_str())?;
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct FunctionType3 {
+    name: String, 
+    mutability: Mutability,
+    reference: Reference,
+    ty: FunctionType2,
+    generic: Vec<FunctionType3>
 }
 
 #[derive(Clone, Debug)]
@@ -193,11 +245,11 @@ pub struct FunctionParameter {
     t: FunctionType,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Function {
     name: String,
-    ret: Option<FunctionType>,
-    args: Vec<FunctionParameter>,
+    ret: Option<FunctionType3>,
+    args: Vec<FunctionType3>,
 }
 
 #[derive(Clone, Debug)]
@@ -223,21 +275,23 @@ impl FunctionVisitor {
     }
 
     fn register(&mut self, name: String, decl: &rustc_ast::ptr::P<rustc_ast::ast::FnDecl>) {
-        self.functions.push(Function {
-            name,
-            ret: match &decl.output {
-                rustc_ast::ast::FnRetTy::Default(_) => None,
-                rustc_ast::ast::FnRetTy::Ty(ty) => Some(FunctionType::new(&ty)),
-            },
-            args: decl
-                .inputs
-                .iter()
-                .map(|param| FunctionParameter {
-                    name: rustc_ast_pretty::pprust::pat_to_string(&param.pat.clone().into_inner()),
-                    t: FunctionType::new(&param.ty),
-                })
-                .collect(),
-        });
+        println!("{:?}", &decl.inputs);
+        println!("register!");
+        // self.functions.push(Function {
+        //     name,
+        //     ret: match &decl.output {
+        //         rustc_ast::ast::FnRetTy::Default(_) => None,
+        //         rustc_ast::ast::FnRetTy::Ty(ty) => Some(FunctionType::new(&ty)),
+        //     },
+        //     args: decl
+        //         .inputs
+        //         .iter()
+        //         .map(|param| FunctionParameter {
+        //             name: rustc_ast_pretty::pprust::pat_to_string(&param.pat.clone().into_inner()),
+        //             t: FunctionType::new(&param.ty),
+        //         })
+        //         .collect(),
+        // });
     }
 }
 
@@ -262,10 +316,99 @@ impl<'a> visit::Visitor<'a> for FunctionVisitor {
     }
 }
 
-struct CompilerCallbacks {
+pub struct CompilerCallbacks {
     source: SourceImpl,
     functions: Vec<Function>,
 }
+
+
+fn handle_prim_ty(typ: PrimTy) -> FunctionType2 {
+    match typ {
+        PrimTy::Int(ty) => {
+            match ty {
+                IntTy::I16 => return FunctionType2::I16,
+                IntTy::I32 => return FunctionType2::I32,
+                IntTy::I64 => return FunctionType2::I64,
+                _ => return FunctionType2::Null,
+            }
+        },
+        PrimTy::Uint(ty) => {
+            match ty {
+                UintTy::U16 => return FunctionType2::U16,
+                UintTy::U32 => return FunctionType2::U32,
+                UintTy::U64 => return FunctionType2::U64,
+                _ => return FunctionType2::Null,
+            }
+        },
+        PrimTy::Float(ty) => {
+            match ty {
+                FloatTy::F32 => return FunctionType2::F32,
+                FloatTy::F64 => return FunctionType2::F64,
+            }
+        },
+        PrimTy::Bool => return FunctionType2::Bool,
+        PrimTy::Char => return FunctionType2::Char,
+        PrimTy::Str => return FunctionType2::Str,
+        _ => todo!()
+    }
+}
+
+fn handle_ty(ty: &Ty) -> FunctionType3 {
+    let mut result = FunctionType3 {
+        name: String::new(), 
+        mutability: Mutability::No,
+        reference: Reference::No,
+        ty: FunctionType2::Null,
+        generic: vec![]
+    };
+    match &ty.kind {
+        TyKind::Path(path) => {
+            if let QPath::Resolved(_, rpath) = path {
+                match rpath.res {
+                    Res::PrimTy(typ) => {
+                        let segment = &rpath.segments[0];
+                        result.name = segment.ident.name.to_string();
+                        result.ty = handle_prim_ty(typ);
+                    },
+                    Res::Def(_, _) => {
+                        let segment = &rpath.segments[0];
+                        result.name = segment.ident.name.to_string();
+                        if segment.ident.name.as_str() == "Vec" {
+                            result.ty = FunctionType2::Array;
+                            // vec
+                            if let Some(ga) = segment.args {
+                                for arg in ga.args {
+                                    match arg {
+                                        GenericArg::Type(ty) => {
+                                            result.generic.push(handle_ty(ty))
+                                        },
+                                        _ => todo!()
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    _ => todo!()
+                }
+            }
+        },
+        TyKind::Rptr(_, MutTy { ty, mutbl }) => {
+            let mut inner_ty = handle_ty(ty);
+            inner_ty.reference = Reference::Yes;
+            match mutbl {
+                rustc_hir::Mutability::Mut => inner_ty.mutability = Mutability::Yes,
+                rustc_hir::Mutability::Not => inner_ty.mutability = Mutability::No,
+            }
+            return inner_ty;
+        },
+        _ => {}
+    }
+    result
+}
+
+// fn handle_fn_ret_ty(ret_ty: FnRetTy) {
+
+// }
 
 impl rustc_driver::Callbacks for CompilerCallbacks {
     fn config(&mut self, config: &mut Config) {
@@ -289,24 +432,61 @@ impl rustc_driver::Callbacks for CompilerCallbacks {
         _compiler: &Compiler,
         queries: &'tcx Queries<'tcx>,
     ) -> rustc_driver::Compilation {
-        let krate = queries
-            .parse()
-            .expect("no Result<Query<Crate>> found")
-            .take();
+        // analysis
+        if self.functions.len() == 0 {
+            let krate = queries
+                .parse()
+                .expect("no Result<Query<Crate>> found")
+                .take();
+            queries.global_ctxt().unwrap().peek_mut().enter(|tcx| {
+                for item in tcx.hir().items() {
+                    match &item.kind {
+                        rustc_hir::ItemKind::Fn(sig, _, _) => {
+                            let mut function = Function {
+                                name: item.ident.to_string(),
+                                ret: None,
+                                args: vec![]
+                            };
+                            // parse input and output
+                            for arg in sig.decl.inputs {
+                                function.args.push(handle_ty(arg));
+                            }
 
-        // let crate_name = match rustc_attr::find_crate_name(compiler.session(), &krate.attrs) {
-        //     Some(name) => name.to_string(),
-        //     None => String::from("unknown_crate"),
-        // };
-        // println!("In crate: {},\n", crate_name);
+                            match sig.decl.output {
+                                FnRetTy::DefaultReturn(_) => function.ret = None,
+                                FnRetTy::Return(ty) => {
+                                    function.ret = Some(handle_ty(ty));
+                                }
+                            }
+                            self.functions.push(function);
+                        },
+                        _ => continue
+                    }
+                }
+            });
+            // let crate_name = match rustc_attr::find_crate_name(compiler.session(), &krate.attrs) {
+            //     Some(name) => name.to_string(),
+            //     None => String::from("unknown_crate"),
+            // };
+            // println!("In crate: {},\n", crate_name);
 
-        let mut fn_visitor = FunctionVisitor::new();
+            // let mut fn_visitor = FunctionVisitor::new();
 
-        visit::walk_crate(&mut fn_visitor, &krate);
+            // visit::walk_crate(&mut fn_visitor, &krate);
 
-        self.functions = fn_visitor.functions.clone();
+            // self.functions = fn_visitor.functions.clone();
+            // self.functions.push(Function{
+            //     name: String::from("add"),
+            //     ret: None,
+            //     args: vec![]
+            // });
+            return rustc_driver::Compilation::Stop
+        }
+        else {
+            // we have populated functions, continue
+            return rustc_driver::Compilation::Continue
+        }
 
-        rustc_driver::Compilation::Continue
     }
 }
 
@@ -476,14 +656,46 @@ pub fn compile(source: SourceImpl) -> Result<CompilerState, CompilerError> {
     let diagnostics_buffer = sync::Arc::new(sync::Mutex::new(Vec::new()));
     let errors_buffer = sync::Arc::new(sync::Mutex::new(Vec::new()));
 
-    match rustc_driver::catch_fatal_errors(|| {
+    // parse and generate wrapper
+    let parsing_result:Result<(), CompilerError> = match rustc_driver::catch_fatal_errors(|| {
         run_compiler(&mut callbacks, &diagnostics_buffer, &errors_buffer)
     })
     .and_then(|result| result)
     {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            // Read buffered diagnostics
+            let diagnostics =
+                String::from_utf8(diagnostics_buffer.lock().unwrap().clone()).unwrap();
+            eprintln!("{}", diagnostics);
+
+            // Read buffered errors
+            let errors = String::from_utf8(errors_buffer.lock().unwrap().clone()).unwrap();
+            eprintln!("{}", errors);
+
+            return Err(CompilerError {
+                diagnostics,
+                errors,
+                err: format!("{:?}", err),
+            })
+        }
+    };
+    // parse fails, stop
+    if let Err(e) = parsing_result {
+        return Err(e);
+    }
+
+    let mut patched_callback = generate_wrapper(callbacks).unwrap();
+
+    // generate binary
+    match rustc_driver::catch_fatal_errors(|| {
+        run_compiler(&mut patched_callback, &diagnostics_buffer, &errors_buffer)
+    })
+    .and_then(|result| result)
+    {
         Ok(()) => Ok(CompilerState {
-            output: callbacks.source.output.clone(),
-            functions: callbacks.functions.clone(),
+            output: patched_callback.source.output.clone(),
+            functions: patched_callback.functions.clone(),
         }),
         Err(err) => {
             // Read buffered diagnostics

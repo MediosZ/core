@@ -34,7 +34,7 @@ pub fn register(state: &CompilerState, dylib: &DlopenLibrary, loader_impl: *mut 
             loader_impl,
             function_create: function_create(func, &dylib),
             ret: match &func.ret {
-                Some(ret) => Some(ret.name.clone()),
+                Some(ret) => Some(ret.ty.to_string().clone()),
                 _ => None,
             },
             input: func
@@ -42,7 +42,7 @@ pub fn register(state: &CompilerState, dylib: &DlopenLibrary, loader_impl: *mut 
                 .iter()
                 .map(|param| FunctionInputSignature {
                     name: param.name.clone(),
-                    t: param.t.name.clone(),
+                    t: param.ty.to_string().clone(),
                 })
                 .collect(),
         };
