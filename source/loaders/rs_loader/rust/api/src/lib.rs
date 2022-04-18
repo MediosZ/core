@@ -67,7 +67,7 @@ extern "C" {
     fn loader_impl_type(loader_impl: *mut c_void, name: *const c_char) -> *mut c_void;
 
     fn scope_define(scope: *mut c_void, key: *mut c_char, value: *mut c_void) -> c_int;
-
+    pub fn value_type_count(v: *mut c_void) -> c_int;
     pub fn metacall_value_id(v: *mut c_void) -> c_int;
     pub fn metacall_value_to_int(v: *mut c_void) -> c_int;
     pub fn metacall_value_to_bool(v: *mut c_void) -> c_int;
@@ -137,6 +137,34 @@ extern "C" fn function_singleton_invoke(
 ) -> *mut c_void {
     println!("invoke function!");
     println!("get {} args", size);
+    unsafe {
+        let args_ptr = std::slice::from_raw_parts(args_p, size);
+        let num_arr = metacall_value_to_array(args_ptr[0]);
+        let mut count = value_type_count(args_ptr[0]);
+        // println!("value count: {}", count);
+        let mut nums: Vec<i32> = 
+            std::slice::from_raw_parts(num_arr, count as usize)
+            .iter()
+            .map(|p| metacall_value_to_int(*p))
+            .collect();
+        println!("{:?}", nums);
+
+        let payload = Box::from_raw(func_impl as *mut Payload);
+        // let test_func: fn(*const i32, usize) -> i32 = std::mem::transmute_copy(&(*payload.func));
+        // println!("test: {}", test_func(nums.as_ptr(), 3));
+        // prepare rust args
+        let mut args: Vec<*mut ffi_type> = vec![&mut types::pointer, &mut types::sint32];// &mut types::sint32,&mut types::sint32 
+        let mut cif: ffi_cif = Default::default();
+        prep_cif(&mut cif, ffi_abi_FFI_DEFAULT_ABI, args.len(),
+                &mut types::sint32, args.as_mut_ptr()).unwrap();
+        let result: i32 = call(&mut cif, 
+            CodePtr::from_ptr(*payload.func), 
+            vec![&mut nums.as_mut_ptr() as *mut _ as *mut c_void, &mut count as *mut _ as *mut c_void].as_mut_ptr()
+            // args_p.as_mut_ptr()//vec![ &mut 5i32 as *mut _ as *mut c_void, &mut 6i32 as *mut _ as *mut c_void ].as_mut_ptr()
+        );
+        std::mem::forget(payload);
+        return metacall_value_create_int(result);
+    };
 
 
 

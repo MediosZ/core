@@ -1545,13 +1545,11 @@ function_return function_py_interface_invoke(function func, function_impl impl, 
 	value v = py_loader_impl_capi_to_value(py_func->impl, result, id);
 
 	Py_DECREF(result);
-	PyThreadState_Clear(PyThreadState_Get());
 	PyGILState_Release(gstate);
 
 	return v;
 
 error:
-	PyThreadState_Clear(PyThreadState_Get());
 	PyGILState_Release(gstate);
 	return NULL;
 }

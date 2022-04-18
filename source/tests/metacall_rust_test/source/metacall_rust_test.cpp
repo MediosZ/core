@@ -38,7 +38,21 @@ TEST_F(metacall_rust_test, DefaultConstructor)
 	EXPECT_EQ((int)0, (int)metacall_load_from_file("rs", rs_scripts, sizeof(rs_scripts) / sizeof(rs_scripts[0]), NULL));
 
 	// TODO: Call
+	void *array_args[] = {
+		metacall_value_create_array(NULL, 3)
+	};
 
+	void **array_value = metacall_value_to_array(array_args[0]);
+
+	array_value[0] = metacall_value_create_int(3);
+	array_value[1] = metacall_value_create_int(5);
+	array_value[2] = metacall_value_create_int(7);
+
+	void *ret = metacallv_s("metacall_add_vec2", array_args, 1);
+	EXPECT_EQ((int)15, (int)metacall_value_to_int(ret));
+
+	metacall_value_destroy(ret);
+	metacall_value_destroy(array_args[0]);
 	/* Print inspect information */
 	{
 		size_t size = 0;
