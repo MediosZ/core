@@ -1,6 +1,6 @@
 use crate::{FunctionType3, FunctionType2};
 
-use super::Wrapper;
+use super::{Wrapper, value_to_type, value_create_type};
 
 #[derive(Debug, Clone)]
 pub struct Number{
@@ -28,26 +28,26 @@ impl Wrapper for Number {
         format!("var_num{}", self.idx)
     }
     fn transform(&self, args_ptr: &str) -> String {
-        format!("let {} = metacall_value_to_int({}[{}]);\n", self.var_name(), args_ptr, self.idx)
+        format!("let {} = {}({}[{}]);\n", self.var_name(), value_to_type(&self.ty.ty), args_ptr, self.idx)
     }
     fn cleanup(&self) -> String {
         format!("\n")
     }
 
     fn handle_ret(&self, ret_name: &str) -> String {
-        format!("metacall_value_create_int({})", ret_name)
+        format!("{}({})", value_create_type(&self.ty.ty), ret_name)
     }
-    fn get_args_type(&self) -> Vec<FunctionType3> {
-        vec![FunctionType3{
+    fn get_args_type(&self) -> FunctionType3 {
+        FunctionType3{
             name: self.arg_name(),
-            ty: FunctionType2::Ptr,
+            // ty: FunctionType2::Ptr,
             ..self.ty.clone()
-        }]
+        }
     }
 
     fn get_ret_type(&self) -> FunctionType3 {
         FunctionType3{
-            ty: FunctionType2::Ptr,
+            // ty: FunctionType2::Ptr,
             ..self.ty.clone()
         }
     }

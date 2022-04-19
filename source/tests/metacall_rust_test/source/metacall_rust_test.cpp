@@ -55,7 +55,32 @@ TEST_F(metacall_rust_test, DefaultConstructor)
 
 	ret = metacall("metacall_add", 5, 10);
 	EXPECT_EQ((int)15, (int)metacall_value_to_int(ret));
+
+	ret = metacall("metacall_add_float", 5.0, 10.0);
+	EXPECT_EQ((float)15.0, (float)metacall_value_to_float(ret));
 	metacall_value_destroy(ret);
+
+	void *args[] = {
+		metacall_value_create_map(NULL, 2)
+	};
+
+	void **map_value = metacall_value_to_map(args[0]);
+
+	map_value[0] = metacall_value_create_array(NULL, 2);
+	void **tupla0 = metacall_value_to_array(map_value[0]);
+	static const int key0 = 3;
+	tupla0[0] = metacall_value_create_int(key0);
+	tupla0[1] = metacall_value_create_float(5.0);
+
+	map_value[1] = metacall_value_create_array(NULL, 2);
+	void **tupla1 = metacall_value_to_array(map_value[1]);
+	static const int key1 = 5;
+	tupla1[0] = metacall_value_create_int(key1);
+	tupla1[1] = metacall_value_create_float(10.0);
+
+	ret = metacallv_s("metacall_add_map", args, 1);
+	EXPECT_EQ((float)15.0, (float)metacall_value_to_float(ret));
+	metacall_value_destroy(args[0]);
 
 	/* Print inspect information */
 	{

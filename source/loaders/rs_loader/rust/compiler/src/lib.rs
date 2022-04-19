@@ -216,6 +216,7 @@ pub enum FunctionType2{
     Bool,
     Char, 
     Array,
+    Map,
     Slice,
     Str,
     Ptr,
@@ -376,6 +377,19 @@ fn handle_ty(ty: &Ty) -> FunctionType3 {
                         if segment.ident.name.as_str() == "Vec" {
                             result.ty = FunctionType2::Array;
                             // vec
+                            if let Some(ga) = segment.args {
+                                for arg in ga.args {
+                                    match arg {
+                                        GenericArg::Type(ty) => {
+                                            result.generic.push(handle_ty(ty))
+                                        },
+                                        _ => todo!()
+                                    }
+                                }
+                            }
+                        }
+                        else if segment.ident.name.as_str() == "HashMap"  {
+                            result.ty = FunctionType2::Map;
                             if let Some(ga) = segment.args {
                                 for arg in ga.args {
                                     match arg {

@@ -1,6 +1,7 @@
 mod array;
 mod number;
 mod null;
+mod map;
 
 
 use crate::Function;
@@ -16,9 +17,51 @@ trait Wrapper {
     fn cleanup(&self) -> String;
     fn arg_name(&self) -> String;
     fn var_name(&self) -> String;
-    fn get_args_type(&self) -> Vec<FunctionType3>;
+    fn get_args_type(&self) -> FunctionType3;
     fn get_ret_type(&self) -> FunctionType3;
     fn handle_ret(&self, ret_name: &str) -> String;
+}
+
+fn value_to_type(ty: &FunctionType2) -> String {
+    match ty{
+        FunctionType2::I16 | FunctionType2::U16 => "metacall_value_to_short".to_string(),
+        FunctionType2::I32 | FunctionType2::U32 => "metacall_value_to_int".to_string(),
+        FunctionType2::I64 | FunctionType2::U64=> "metacall_value_to_long".to_string(),
+        FunctionType2::Bool=> "metacall_value_to_bool".to_string(),
+        FunctionType2::Char=> "metacall_value_to_char".to_string(),
+        FunctionType2::F32=> "metacall_value_to_float".to_string(),
+        FunctionType2::F64=> "metacall_value_to_double".to_string(),
+        _ => todo!()
+    }
+}
+
+fn value_to_rust_type(ty: &FunctionType2) -> String {
+    match ty{
+        FunctionType2::I16 => "i16".to_string(),
+        FunctionType2::I32 => "i32".to_string(),
+        FunctionType2::I64 => "i64".to_string(),
+        FunctionType2::U16 => "u16".to_string(),
+        FunctionType2::U32 => "u32".to_string(),
+        FunctionType2::U64 => "u64".to_string(),
+        FunctionType2::Bool=> "bool".to_string(),
+        FunctionType2::Char=> "char".to_string(),
+        FunctionType2::F32=> "f32".to_string(),
+        FunctionType2::F64=> "f64".to_string(),
+        _ => todo!()
+    }
+}
+
+fn value_create_type(ty: &FunctionType2) -> String {
+    match ty{
+        FunctionType2::I16 | FunctionType2::U16 => "metacall_value_create_short".to_string(),
+        FunctionType2::I32 | FunctionType2::U32 => "metacall_value_create_int".to_string(),
+        FunctionType2::I64 | FunctionType2::U64=> "metacall_value_create_long".to_string(),
+        FunctionType2::Bool=> "metacall_value_create_bool".to_string(),
+        FunctionType2::Char=> "metacall_value_create_char".to_string(),
+        FunctionType2::F32=> "metacall_value_create_float".to_string(),
+        FunctionType2::F64=> "metacall_value_create_double".to_string(),
+        _ => todo!()
+    }
 }
 
 
@@ -52,6 +95,9 @@ fn function_to_wrapper(idx: usize, typ: &FunctionType3) -> Box<dyn Wrapper> {
         FunctionType2::Array => {
             Box::new(array::Vec::new(idx, typ.clone()))
         },
+        FunctionType2::Map => {
+            Box::new(map::Map::new(idx, typ.clone()))
+        },
         // FunctionType2::Null => Box::new(null::Null{}),
         _ => todo!()
     }
@@ -75,7 +121,9 @@ impl WrapperFunction {
 
     fn generate(&self) -> String {
         let mut wrapper_string = String::new();
-        wrapper_string.push_str(format!("#[no_mangle]\npub unsafe fn metacall_{}(args_p: *mut *mut c_void, size: usize) -> *mut c_void {{", self.name).as_str());
+        wrapper_string.push_str(format!("#[no_mangle]
+pub unsafe fn metacall_{}(args_p: *mut *mut c_void, size: usize) -> *mut c_void {{
+", self.name).as_str());
         wrapper_string.push_str("    let args_ptr = std::slice::from_raw_parts(args_p, size);\n");
 
         // transform
@@ -132,6 +180,7 @@ extern \"C\" {
     fn metacall_value_to_float(v: *mut c_void) -> c_float;
     fn metacall_value_to_double(v: *mut c_void) -> c_double;
     fn metacall_value_to_array(v: *mut c_void) -> *mut *mut c_void;
+    fn metacall_value_to_map(v: *mut c_void) -> *mut *mut c_void;
     fn metacall_value_to_ptr(v: *mut c_void) -> *mut c_void;
     fn metacall_function(cfn: *const c_char) -> *mut c_void;
     fn metacall_value_create_int(i: c_int) -> *mut c_void;
@@ -165,7 +214,7 @@ extern \"C\" {
             new_function.ret = Some(ret.get_ret_type());
         }
         for arg in wrapper_func.args.iter() {
-            new_function.args.extend(arg.get_args_type());
+            new_function.args.push(arg.get_args_type());
         }
         // println!("{:?}", new_function);
         // function need strings.
