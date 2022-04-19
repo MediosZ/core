@@ -4,9 +4,6 @@ use api::{register_function, function_singleton, FunctionCreate, FunctionInputSi
 
 // use dlopen::raw::Library as DlopenLibrary;
 use crate::file::DlopenLibrary;
-use libffi::low::CodePtr;
-use libffi::low::*;
-
 use crate::{CompilerState, Function};
 
 fn function_create(func: &Function, dlopen_library: &DlopenLibrary) -> FunctionCreate {

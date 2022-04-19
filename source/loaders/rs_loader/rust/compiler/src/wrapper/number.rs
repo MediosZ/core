@@ -1,4 +1,4 @@
-use crate::FunctionType3;
+use crate::{FunctionType3, FunctionType2};
 
 use super::Wrapper;
 
@@ -19,29 +19,35 @@ impl Number {
 
 impl Wrapper for Number {
     fn as_arg(&self) -> String {
-        format!("num{}: {}, ", self.idx, self.ty.name)
+        format!("{}: *mut c_void, ", self.arg_name())
     }
-    fn as_ret(&self) -> String{
-        format!("{}", self.ty.name)
-    }
-    fn name(&self) -> String {
+    fn arg_name(&self) -> String {
         format!("num{}", self.idx)
     }
-    fn transform(&self) -> String {
-        format!("\n")
+    fn var_name(&self) -> String {
+        format!("var_num{}", self.idx)
+    }
+    fn transform(&self, args_ptr: &str) -> String {
+        format!("let {} = metacall_value_to_int({}[{}]);\n", self.var_name(), args_ptr, self.idx)
     }
     fn cleanup(&self) -> String {
         format!("\n")
     }
+
+    fn handle_ret(&self, ret_name: &str) -> String {
+        format!("metacall_value_create_int({})", ret_name)
+    }
     fn get_args_type(&self) -> Vec<FunctionType3> {
         vec![FunctionType3{
-            name: self.name(),
+            name: self.arg_name(),
+            ty: FunctionType2::Ptr,
             ..self.ty.clone()
         }]
     }
 
     fn get_ret_type(&self) -> FunctionType3 {
         FunctionType3{
+            ty: FunctionType2::Ptr,
             ..self.ty.clone()
         }
     }
@@ -49,9 +55,8 @@ impl Wrapper for Number {
 
 /*
 #[no_mangle]
-fn metacall_add_vec_inner(vec_p0: *mut i32, vec_l0: usize) -> i32 {
-    let vec0: Vec<i32> = std::slice::from_raw_parts(vec_p0, vec_l0).to_vec();
-    let metacall_res = add_vec_inner(vec0, );
-    std::mem::forget(vec0);
-    metacall_res 
+fn metacall_number(num0: *mut c_void) -> *mut c_void {
+    let r_num0 = metacall_value_to_int(num0);
+    let metacall_res = number(r_num0, );
+    metacall_res as *mut c_void
 } */

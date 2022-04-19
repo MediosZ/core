@@ -17,9 +17,3 @@ pub fn add_vec(vec: &mut Vec<i32>) -> i32 {
 pub fn add_vec2(vec: Vec<i32>) -> i32 {
     vec.iter().sum()
 }
-
-#[no_mangle]
-pub fn pass_float(n: f32) -> f32{
-    println!("{}", n);
-    n
-}

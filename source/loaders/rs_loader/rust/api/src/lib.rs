@@ -1,7 +1,7 @@
 use std::{
     ffi::{c_void, CString},
     os::raw::{c_char, c_double, c_float, c_int, c_long, c_short},
-    path::PathBuf, boxed,
+    path::PathBuf, boxed, result, env::args,
 };
 use libffi::low::{CodePtr, types, ffi_cif, ffi_type, prep_cif, call, ffi_abi_FFI_DEFAULT_ABI};
 use dlopen::raw::Library as DlopenLibrary;
@@ -90,22 +90,7 @@ extern "C" {
     pub fn metacall_value_create_string(st: *const c_char, ln: usize) -> *mut c_void;
 }
 
-fn handle_typeid(id: i32) -> ffi_type {
-    unsafe {
-        match id  {
-            0 => types::void,
-            1 => types::uint8,
-            2 => types::sint16,
-            3 => types::sint32,
-            4 => types::sint64,
-            5 => types::float,
-            6 => types::double,
-            14 => types::void,
-            _ => types::pointer,
-        }
-    }
 
-}
 #[repr(C)]
 pub struct FunctionInterface {
     create: extern "C" fn(*mut c_void, *mut c_void) -> c_int,
@@ -124,7 +109,6 @@ pub struct FunctionInterface {
 
 #[no_mangle]
 extern "C" fn function_singleton_create(_func: *mut c_void, func_impl: *mut c_void) -> c_int {
-    println!("create function!");
     0
 }
 
@@ -135,52 +119,13 @@ extern "C" fn function_singleton_invoke(
     args_p: *mut *mut c_void,
     size: usize,
 ) -> *mut c_void {
-    println!("invoke function!");
-    println!("get {} args", size);
     unsafe {
-        let args_ptr = std::slice::from_raw_parts(args_p, size);
-        let num_arr = metacall_value_to_array(args_ptr[0]);
-        let mut count = value_type_count(args_ptr[0]);
-        // println!("value count: {}", count);
-        let mut nums: Vec<i32> = 
-            std::slice::from_raw_parts(num_arr, count as usize)
-            .iter()
-            .map(|p| metacall_value_to_int(*p))
-            .collect();
-        println!("{:?}", nums);
-
         let payload = Box::from_raw(func_impl as *mut Payload);
-        // let test_func: fn(*const i32, usize) -> i32 = std::mem::transmute_copy(&(*payload.func));
-        // println!("test: {}", test_func(nums.as_ptr(), 3));
-        // prepare rust args
-        let mut args: Vec<*mut ffi_type> = vec![&mut types::pointer, &mut types::sint32];// &mut types::sint32,&mut types::sint32 
-        let mut cif: ffi_cif = Default::default();
-        prep_cif(&mut cif, ffi_abi_FFI_DEFAULT_ABI, args.len(),
-                &mut types::sint32, args.as_mut_ptr()).unwrap();
-        let result: i32 = call(&mut cif, 
-            CodePtr::from_ptr(*payload.func), 
-            vec![&mut nums.as_mut_ptr() as *mut _ as *mut c_void, &mut count as *mut _ as *mut c_void].as_mut_ptr()
-            // args_p.as_mut_ptr()//vec![ &mut 5i32 as *mut _ as *mut c_void, &mut 6i32 as *mut _ as *mut c_void ].as_mut_ptr()
-        );
+        let func: fn(*mut *mut c_void, usize) -> *mut c_void = std::mem::transmute_copy(&(*payload.func));
+        let result =  func(args_p, size);
         std::mem::forget(payload);
-        return metacall_value_create_int(result);
-    };
-
-
-
-    // func is of type function found here: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/reflect/include/reflect/reflect_function.h#L65
-    // func_impl is of type: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/loaders/rs_loader/rust/compiler/src/registrator.rs#L19
-    // args is an array of 'value' of size 'size', you can iterate over it and get the C value representation
-    // The task to do is very similar to this: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/loaders/c_loader/source/c_loader_impl.cpp#L378
-    // But implemented in Rust. We can forget about closures for now, because that's designed in order to implement callbacks
-
-    // In the example of C invoke, the func_impl is not just the address but a struct which contains this:
-    // https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/loaders/c_loader/source/c_loader_impl.cpp#L69
-
-    // Last element is the address, but the rest are for interfacing with the libffi API. I allocate them while discovering in order
-    // to precompute the call and waste less memory and allocations during the invoke.
-
-    0 as *mut c_void
+        result
+    }
 }
 
 #[no_mangle]
@@ -193,16 +138,13 @@ extern "C" fn function_singleton_await(
     _reject: extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void,
     _data: *mut c_void,
 ) -> *mut c_void {
-    println!("await function!");
     0 as *mut c_void
 }
 
 #[no_mangle]
 extern "C" fn function_singleton_destroy(_func: *mut c_void, func_impl: *mut c_void) {
-    println!("destroy function!");
     unsafe {
         let payload = Box::from_raw(func_impl as *mut Payload);
-        // std::mem::forget(payload);
         drop(payload);
     }
     // Here we have to free the memory of this: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/loaders/rs_loader/rust/compiler/src/registrator.rs#L19
