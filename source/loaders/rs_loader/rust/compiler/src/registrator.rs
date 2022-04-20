@@ -24,7 +24,7 @@ fn function_create(func: &Function, dlopen_library: &DlopenLibrary) -> FunctionC
     function_create
 }
 
-pub fn register(state: &CompilerState, dylib: &DlopenLibrary, loader_impl: *mut c_void, ctx: *mut c_void) {
+pub fn register(state: &CompilerState, dlopen_library: &DlopenLibrary, loader_impl: *mut c_void, ctx: *mut c_void) {
     for func in state.functions.iter() {
         let function_registration = FunctionRegisteration {
             ctx,

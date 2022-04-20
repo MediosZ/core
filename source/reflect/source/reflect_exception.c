@@ -29,14 +29,42 @@
 
 struct exception_type
 {
-	char *message;
-	char *label;
-	int code;
-	char *stacktrace;
-	uint64_t id;
+	char *message;	  /* Description of the error */
+	char *label;	  /* Type of error */
+	int number;		  /* Numeric code of error */
+	char *stacktrace; /* Stack trace of the error */
+	uint64_t id;	  /* Thread id where the error was raised */
+	size_t ref_count;
 };
 
-exception exception_create(const char *message, const char *label, int code, const char *stacktrace)
+static struct
+{
+	uint64_t allocations;
+	uint64_t deallocations;
+	uint64_t increments;
+	uint64_t decrements;
+} exception_stats = { 0, 0, 0, 0 };
+
+exception exception_create(char *message, char *label, int number, char *stacktrace)
+{
+	exception ex = malloc(sizeof(struct exception_type));
+
+	if (ex == NULL)
+	{
+		return NULL;
+	}
+
+	ex->message = message;
+	ex->label = label;
+	ex->number = number;
+	ex->stacktrace = stacktrace;
+	ex->id = thread_id_get_current();
+	ex->ref_count = 0;
+
+	return ex;
+}
+
+exception exception_create_const(const char *message, const char *label, int number, const char *stacktrace)
 {
 	exception ex = malloc(sizeof(struct exception_type));
 
@@ -99,27 +127,57 @@ exception exception_create(const char *message, const char *label, int code, con
 		ex->stacktrace = NULL;
 	}
 
-	ex->code = code;
-
+	ex->number = number;
 	ex->id = thread_id_get_current();
 
 	return ex;
 
 stacktrace_bad_alloc:
-
 	free(ex->label);
-
 label_bad_alloc:
-
 	free(ex->message);
-
 message_bad_alloc:
-
 	free(ex);
-
 exception_bad_alloc:
-
 	return NULL;
+}
+
+int exception_increment_reference(exception ex)
+{
+	if (ex == NULL)
+	{
+		return 1;
+	}
+
+	if (ex->ref_count == SIZE_MAX)
+	{
+		return 1;
+	}
+
+	++ex->ref_count;
+	++exception_stats.increments;
+
+	++exception_stats.allocations;
+
+	return 0;
+}
+
+int exception_decrement_reference(exception ex)
+{
+	if (ex == NULL)
+	{
+		return 1;
+	}
+
+	if (ex->ref_count == 0)
+	{
+		return 1;
+	}
+
+	--ex->ref_count;
+	++exception_stats.decrements;
+
+	return 0;
 }
 
 const char *exception_message(exception ex)
@@ -142,14 +200,14 @@ const char *exception_label(exception ex)
 	return ex->label;
 }
 
-int exception_code(exception ex)
+int exception_number(exception ex)
 {
 	if (ex == NULL)
 	{
 		return 0;
 	}
 
-	return ex->code;
+	return ex->number;
 }
 
 const char *exception_stacktrace(exception ex)
@@ -162,25 +220,50 @@ const char *exception_stacktrace(exception ex)
 	return ex->stacktrace;
 }
 
+void exception_stats_debug(void)
+{
+#if !(!defined(NDEBUG) || defined(DEBUG) || defined(_DEBUG) || defined(__DEBUG) || defined(__DEBUG__))
+	if (exception_stats.allocations != exception_stats.deallocations || exception_stats.increments != exception_stats.decrements)
+#endif
+	{
+		printf("----------------- EXCEPTIONS -----------------\n");
+		printf("Allocations: %" PRIuS "\n", exception_stats.allocations);
+		printf("Deallocations: %" PRIuS "\n", exception_stats.deallocations);
+		printf("Increments: %" PRIuS "\n", exception_stats.increments);
+		printf("Decrements: %" PRIuS "\n", exception_stats.decrements);
+		fflush(stdout);
+	}
+}
+
 void exception_destroy(exception ex)
 {
 	if (ex != NULL)
 	{
-		if (ex->message != NULL)
+		if (exception_decrement_reference(ex) != 0)
 		{
-			free(ex->message);
+			log_write("metacall", LOG_LEVEL_ERROR, "Invalid reference counter in exception: %s", ex->label ? ex->label : "<anonymous>");
 		}
 
-		if (ex->label != NULL)
+		if (ex->ref_count == 0)
 		{
-			free(ex->label);
-		}
+			if (ex->message != NULL)
+			{
+				free(ex->message);
+			}
 
-		if (ex->stacktrace != NULL)
-		{
-			free(ex->stacktrace);
-		}
+			if (ex->label != NULL)
+			{
+				free(ex->label);
+			}
 
-		free(ex);
+			if (ex->stacktrace != NULL)
+			{
+				free(ex->stacktrace);
+			}
+
+			free(ex);
+
+			++exception_stats.deallocations;
+		}
 	}
 }

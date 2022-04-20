@@ -139,6 +139,7 @@ extern "C" fn function_singleton_await(
     _reject: extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void,
     _data: *mut c_void,
 ) -> *mut c_void {
+    println!("rs_loader: await function");
     0 as *mut c_void
 }
 
