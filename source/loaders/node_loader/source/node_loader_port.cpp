@@ -39,6 +39,8 @@ struct promise_context_type
 	napi_deferred deferred;
 };
 
+static const loader_tag node_loader_tag = "node";
+
 napi_value node_loader_port_call(napi_env env, napi_callback_info info)
 {
 	size_t argc = 0;
@@ -78,7 +80,7 @@ napi_value node_loader_port_call(napi_env env, napi_callback_info info)
 	node_loader_impl_exception(env, status);
 
 	/* Obtain NodeJS loader implementation */
-	loader_impl impl = loader_get_impl("node");
+	loader_impl impl = loader_get_impl(node_loader_tag);
 	loader_impl_node node_impl = (loader_impl_node)loader_impl_get(impl);
 
 	/* Store current reference of the environment */
@@ -93,6 +95,11 @@ napi_value node_loader_port_call(napi_env env, napi_callback_info info)
 	void *ret = metacallv_s(name, args, argc - 1);
 
 	napi_value result = node_loader_impl_value_to_napi(node_impl, env, ret);
+
+	if (metacall_value_id(ret) == METACALL_THROWABLE)
+	{
+		napi_throw(env, result);
+	}
 
 	/* Release current reference of the environment */
 	// node_loader_impl_env(node_impl, NULL);
@@ -150,7 +157,7 @@ napi_value node_loader_port_await(napi_env env, napi_callback_info info)
 	node_loader_impl_exception(env, status);
 
 	/* Obtain NodeJS loader implementation */
-	loader_impl impl = loader_get_impl("node");
+	loader_impl impl = loader_get_impl(node_loader_tag);
 	loader_impl_node node_impl = (loader_impl_node)loader_impl_get(impl);
 
 	/* Store current reference of the environment */
@@ -291,7 +298,7 @@ napi_value node_loader_port_load_from_file(napi_env env, napi_callback_info info
 	if (path_index == paths_size)
 	{
 		/* Obtain NodeJS loader implementation */
-		loader_impl impl = loader_get_impl("node");
+		loader_impl impl = loader_get_impl(node_loader_tag);
 		loader_impl_node node_impl = (loader_impl_node)loader_impl_get(impl);
 
 		/* Store current reference of the environment */
@@ -379,7 +386,7 @@ napi_value node_loader_port_load_from_file_export(napi_env env, napi_callback_in
 	if (path_index == paths_size)
 	{
 		/* Obtain NodeJS loader implementation */
-		loader_impl impl = loader_get_impl("node");
+		loader_impl impl = loader_get_impl(node_loader_tag);
 		node_impl = (loader_impl_node)loader_impl_get(impl);
 
 		/* Store current reference of the environment */
@@ -484,7 +491,7 @@ napi_value node_loader_port_load_from_memory(napi_env env, napi_callback_info in
 	node_loader_impl_exception(env, status);
 
 	/* Obtain NodeJS loader implementation */
-	loader_impl impl = loader_get_impl("node");
+	loader_impl impl = loader_get_impl(node_loader_tag);
 	loader_impl_node node_impl = (loader_impl_node)loader_impl_get(impl);
 
 	/* Store current reference of the environment */
@@ -561,7 +568,7 @@ napi_value node_loader_port_load_from_memory_export(napi_env env, napi_callback_
 	node_loader_impl_exception(env, status);
 
 	/* Obtain NodeJS loader implementation */
-	loader_impl impl = loader_get_impl("node");
+	loader_impl impl = loader_get_impl(node_loader_tag);
 	loader_impl_node node_impl = (loader_impl_node)loader_impl_get(impl);
 
 	/* Store current reference of the environment */

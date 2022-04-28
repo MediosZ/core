@@ -29,6 +29,8 @@
 	#error "The Python Loader Port must be defined"
 #endif
 
+static const loader_tag py_loader_tag = "py";
+
 static PyObject *py_loader_port_none(void)
 {
 	Py_RETURN_NONE;
@@ -186,11 +188,7 @@ static PyObject *py_loader_port_load_from_file(PyObject *self, PyObject *args)
 
 	/* Execute the load from file call */
 	{
-		PyThreadState *thread_state = PyEval_SaveThread();
-
 		int ret = metacall_load_from_file(tag_str, (const char **)paths_str, paths_size, NULL);
-
-		PyEval_RestoreThread(thread_state);
 
 		if (ret != 0)
 		{
@@ -295,11 +293,7 @@ static PyObject *py_loader_port_load_from_package(PyObject *self, PyObject *args
 	}
 
 	/* Execute the load from file call */
-	PyThreadState *thread_state = PyEval_SaveThread();
-
 	int ret = metacall_load_from_package(tag_str, path_str, NULL);
-
-	PyEval_RestoreThread(thread_state);
 
 	return ret == 0 ? py_loader_port_true() : py_loader_port_false();
 }
@@ -382,11 +376,7 @@ static PyObject *py_loader_port_load_from_memory(PyObject *self, PyObject *args)
 
 	/* Execute the load from memory call */
 	{
-		PyThreadState *thread_state = PyEval_SaveThread();
-
 		int ret = metacall_load_from_memory(tag_str, (const char *)buffer_str, buffer_length + 1, NULL);
-
-		PyEval_RestoreThread(thread_state);
 
 		if (ret != 0)
 		{
@@ -410,7 +400,7 @@ static PyObject *py_loader_port_invoke(PyObject *self, PyObject *var_args)
 	(void)self;
 
 	/* Obtain Python loader implementation */
-	impl = loader_get_impl("py");
+	impl = loader_get_impl(py_loader_tag);
 
 	if (impl == NULL)
 	{
@@ -472,8 +462,6 @@ static PyObject *py_loader_port_invoke(PyObject *self, PyObject *var_args)
 
 	/* Execute the invocation */
 	{
-		PyThreadState *thread_state = PyEval_SaveThread();
-
 		void *ret;
 
 		if (value_args != NULL)
@@ -484,8 +472,6 @@ static PyObject *py_loader_port_invoke(PyObject *self, PyObject *var_args)
 		{
 			ret = metacallv_s(name_str, metacall_null_args, 0);
 		}
-
-		PyEval_RestoreThread(thread_state);
 
 		if (ret == NULL)
 		{
@@ -533,7 +519,7 @@ static PyObject *py_loader_port_await(PyObject *self, PyObject *var_args)
 	(void)self;
 
 	/* Obtain Python loader implementation */
-	impl = loader_get_impl("py");
+	impl = loader_get_impl(py_loader_tag);
 
 	if (impl == NULL)
 	{
@@ -595,8 +581,6 @@ static PyObject *py_loader_port_await(PyObject *self, PyObject *var_args)
 
 	/* Execute the await */
 	{
-		PyThreadState *thread_state = PyEval_SaveThread();
-
 		void *ret;
 
 		/* TODO: */
@@ -610,8 +594,6 @@ static PyObject *py_loader_port_await(PyObject *self, PyObject *var_args)
 			ret = metacallv_s(name_str, metacall_null_args, 0);
 		}
 		*/
-
-		PyEval_RestoreThread(thread_state);
 
 		if (ret == NULL)
 		{

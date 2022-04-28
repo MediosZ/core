@@ -31,10 +31,11 @@ struct exception_type
 {
 	char *message;	  /* Description of the error */
 	char *label;	  /* Type of error */
-	int number;		  /* Numeric code of error */
+	int64_t code;	  /* Numeric code of error */
 	char *stacktrace; /* Stack trace of the error */
 	uint64_t id;	  /* Thread id where the error was raised */
 	size_t ref_count;
+	/* TODO: value attributes; // This should implement a map for representing the extra attributes of an exception */
 };
 
 static struct
@@ -45,7 +46,7 @@ static struct
 	uint64_t decrements;
 } exception_stats = { 0, 0, 0, 0 };
 
-exception exception_create(char *message, char *label, int number, char *stacktrace)
+exception exception_create(char *message, char *label, int64_t code, char *stacktrace)
 {
 	exception ex = malloc(sizeof(struct exception_type));
 
@@ -56,7 +57,7 @@ exception exception_create(char *message, char *label, int number, char *stacktr
 
 	ex->message = message;
 	ex->label = label;
-	ex->number = number;
+	ex->code = code;
 	ex->stacktrace = stacktrace;
 	ex->id = thread_id_get_current();
 	ex->ref_count = 0;
@@ -64,7 +65,7 @@ exception exception_create(char *message, char *label, int number, char *stacktr
 	return ex;
 }
 
-exception exception_create_const(const char *message, const char *label, int number, const char *stacktrace)
+exception exception_create_const(const char *message, const char *label, int64_t code, const char *stacktrace)
 {
 	exception ex = malloc(sizeof(struct exception_type));
 
@@ -127,8 +128,9 @@ exception exception_create_const(const char *message, const char *label, int num
 		ex->stacktrace = NULL;
 	}
 
-	ex->number = number;
+	ex->code = code;
 	ex->id = thread_id_get_current();
+	ex->ref_count = 0;
 
 	return ex;
 
@@ -200,14 +202,14 @@ const char *exception_label(exception ex)
 	return ex->label;
 }
 
-int exception_number(exception ex)
+int64_t exception_error_code(exception ex)
 {
 	if (ex == NULL)
 	{
 		return 0;
 	}
 
-	return ex->number;
+	return ex->code;
 }
 
 const char *exception_stacktrace(exception ex)

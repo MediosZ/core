@@ -34,8 +34,6 @@ public:
 
 		static const char name[] = "int_mem_type";
 
-		PyObject *dict;
-
 		if (Py_IsInitialized() == 0)
 		{
 			Py_InitializeEx(0);
@@ -54,21 +52,24 @@ public:
 
 		dict = PyModule_GetDict(instance);
 
+		Py_INCREF(dict);
+
 		func = PyDict_GetItemString(dict, "int_mem_type");
+
+		Py_INCREF(func);
 
 		if (!PyCallable_Check(func))
 		{
 			state.SkipWithError("An error ocurred during script loading");
 		}
-
-		Py_DECREF(dict);
 	}
 
 	void TearDown(benchmark::State &state)
 	{
-		Py_DECREF(compiled);
-		Py_DECREF(instance);
 		Py_DECREF(func);
+		Py_DECREF(dict);
+		Py_DECREF(instance);
+		Py_DECREF(compiled);
 
 		if (Py_IsInitialized() != 0)
 		{
@@ -84,6 +85,7 @@ public:
 protected:
 	PyObject *compiled;
 	PyObject *instance;
+	PyObject *dict;
 	PyObject *func;
 };
 
@@ -95,8 +97,6 @@ BENCHMARK_DEFINE_F(metacall_py_c_api_bench, call_object)
 
 	for (auto _ : state)
 	{
-		PyObject *ret;
-
 		state.PauseTiming();
 
 		PyObject *tuple_args = PyTuple_New(2);
@@ -113,7 +113,7 @@ BENCHMARK_DEFINE_F(metacall_py_c_api_bench, call_object)
 
 		for (int64_t it = 0; it < call_count; ++it)
 		{
-			benchmark::DoNotOptimize(ret = PyObject_CallObject(func, tuple_args));
+			PyObject *ret = PyObject_CallObject(func, tuple_args);
 
 			state.PauseTiming();
 
@@ -134,8 +134,6 @@ BENCHMARK_DEFINE_F(metacall_py_c_api_bench, call_object)
 
 		state.PauseTiming();
 
-		Py_DECREF(args[0]);
-		Py_DECREF(args[1]);
 		Py_DECREF(tuple_args);
 
 		state.ResumeTiming();
