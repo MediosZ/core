@@ -1,19 +1,16 @@
-use crate::{FunctionType3, FunctionType2};
+use crate::FunctionParameter;
 
-use super::{Wrapper, value_to_type, value_create_type};
+use super::{value_create_type, value_to_type, Wrapper};
 
 #[derive(Debug, Clone)]
-pub struct Number{
+pub struct Number {
     idx: usize,
-    ty: FunctionType3,
+    ty: FunctionParameter,
 }
 
 impl Number {
-    pub fn new(idx: usize, ty: FunctionType3) -> Self {
-        Self{
-            idx, 
-            ty
-        }
+    pub fn new(idx: usize, ty: FunctionParameter) -> Self {
+        Self { idx, ty }
     }
 }
 
@@ -28,7 +25,13 @@ impl Wrapper for Number {
         format!("var_num{}", self.idx)
     }
     fn transform(&self, args_ptr: &str) -> String {
-        format!("let {} = {}({}[{}]);\n", self.var_name(), value_to_type(&self.ty.ty), args_ptr, self.idx)
+        format!(
+            "let {} = {}({}[{}]);\n",
+            self.var_name(),
+            value_to_type(&self.ty.ty),
+            args_ptr,
+            self.idx
+        )
     }
     fn cleanup(&self) -> String {
         format!("\n")
@@ -37,19 +40,15 @@ impl Wrapper for Number {
     fn handle_ret(&self, ret_name: &str) -> String {
         format!("{}({})", value_create_type(&self.ty.ty), ret_name)
     }
-    fn get_args_type(&self) -> FunctionType3 {
-        FunctionType3{
+    fn get_args_type(&self) -> FunctionParameter {
+        FunctionParameter {
             name: self.arg_name(),
-            // ty: FunctionType2::Ptr,
             ..self.ty.clone()
         }
     }
 
-    fn get_ret_type(&self) -> FunctionType3 {
-        FunctionType3{
-            // ty: FunctionType2::Ptr,
-            ..self.ty.clone()
-        }
+    fn get_ret_type(&self) -> FunctionParameter {
+        FunctionParameter { ..self.ty.clone() }
     }
 }
 

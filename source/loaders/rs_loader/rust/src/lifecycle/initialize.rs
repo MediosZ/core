@@ -2,10 +2,6 @@ use api::{self, PrimitiveMetacallProtocolTypes};
 
 use std::os::raw::{c_int, c_void};
 
-extern fn callback(a: i32) {
-    println!("I'm called from C with value {0}", a);
-}
-
 #[no_mangle]
 pub extern "C" fn rs_loader_impl_initialize(
     loader_impl: *mut c_void,

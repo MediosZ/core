@@ -35,6 +35,16 @@ TEST_F(metacall_rust_test, DefaultConstructor)
 
 	ASSERT_EQ((int)0, (int)metacall_initialize());
 
+	static const char buffer[] =
+		"#[no_mangle]\n"
+		"pub extern \"C\" fn add2(num_1: i32, num_2: i32) -> i32 {\n"
+		"\tnum_1 + num_2\n"
+		"}";
+
+	EXPECT_EQ((int)0, (int)metacall_load_from_memory("rs", buffer, sizeof(buffer), NULL));
+	void *ret = metacall("metacall_add2", 5, 10);
+	EXPECT_EQ((int)15, (int)metacall_value_to_int(ret));
+
 	EXPECT_EQ((int)0, (int)metacall_load_from_file("rs", rs_scripts, sizeof(rs_scripts) / sizeof(rs_scripts[0]), NULL));
 
 	void *array_args[] = {
@@ -47,7 +57,7 @@ TEST_F(metacall_rust_test, DefaultConstructor)
 	array_value[1] = metacall_value_create_int(5);
 	array_value[2] = metacall_value_create_int(7);
 
-	void *ret = metacallv_s("metacall_add_vec2", array_args, 1);
+	ret = metacallv_s("metacall_add_vec2", array_args, 1);
 	EXPECT_EQ((int)15, (int)metacall_value_to_int(ret));
 	ret = metacallv_s("metacall_add_vec", array_args, 1);
 	EXPECT_EQ((int)15, (int)metacall_value_to_int(ret));

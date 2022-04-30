@@ -1,10 +1,8 @@
 use std::{
     ffi::{c_void, CString},
-    os::raw::{c_char, c_double, c_float, c_int, c_long, c_short},
-    path::PathBuf, boxed, result, env::args,
+    os::raw::{c_char, c_int},
+    path::PathBuf,
 };
-use libffi::low::{CodePtr, types, ffi_cif, ffi_type, prep_cif, call, ffi_abi_FFI_DEFAULT_ABI};
-use dlopen::raw::Library as DlopenLibrary;
 
 pub struct LoaderLifecycleState {
     pub execution_paths: Vec<PathBuf>,
@@ -14,11 +12,6 @@ impl LoaderLifecycleState {
         LoaderLifecycleState { execution_paths }
     }
 }
-pub struct Payload{
-    pub number: i32,
-    pub func: Box<*mut c_void>,
-}
-
 extern "C" {
     fn loader_impl_get(loader_impl: *mut c_void) -> *mut c_void;
 
@@ -38,10 +31,6 @@ extern "C" {
     ) -> *mut c_void;
 
     fn type_name(t: *mut c_void) -> *const c_char;
-    
-    fn value_type_id(t: *mut c_void) -> i32;
-
-    fn value_to_array(v: *mut c_void) -> *mut *mut c_void;
 
     fn function_create(
         name: *const c_char,
@@ -67,30 +56,8 @@ extern "C" {
     fn loader_impl_type(loader_impl: *mut c_void, name: *const c_char) -> *mut c_void;
 
     fn scope_define(scope: *mut c_void, key: *mut c_char, value: *mut c_void) -> c_int;
-    pub fn value_type_count(v: *mut c_void) -> c_int;
-    pub fn metacall_value_id(v: *mut c_void) -> c_int;
-    pub fn metacall_value_to_int(v: *mut c_void) -> c_int;
-    pub fn metacall_value_to_bool(v: *mut c_void) -> c_int;
-    pub fn metacall_value_to_char(v: *mut c_void) -> c_char;
-    pub fn metacall_value_to_long(v: *mut c_void) -> c_long;
-    pub fn metacall_value_to_short(v: *mut c_void) -> c_short;
-    pub fn metacall_value_to_float(v: *mut c_void) -> c_float;
-    pub fn metacall_value_to_double(v: *mut c_void) -> c_double;
-    pub fn metacall_value_to_array(v: *mut c_void) -> *mut *mut c_void;
-    pub fn metacall_value_to_map(v: *mut c_void) -> *mut *mut c_void;
-    pub fn metacall_value_to_ptr(v: *mut c_void) -> *mut c_void;
-    pub fn metacall_function(cfn: *const c_char) -> *mut c_void;
-    pub fn metacall_value_create_int(i: c_int) -> *mut c_void;
-    pub fn metacall_value_create_bool(b: c_int) -> *mut c_void;
-    pub fn metacall_value_create_long(l: c_long) -> *mut c_void;
-    pub fn metacall_value_create_char(st: c_char) -> *mut c_void;
-    pub fn metacall_value_create_short(s: c_short) -> *mut c_void;
-    pub fn metacall_value_create_float(f: c_float) -> *mut c_void;
-    pub fn metacall_value_to_string(v: *mut c_void) -> *mut c_char;
-    pub fn metacall_value_create_double(d: c_double) -> *mut c_void;
-    pub fn metacall_value_create_string(st: *const c_char, ln: usize) -> *mut c_void;
-}
 
+}
 
 #[repr(C)]
 pub struct FunctionInterface {
@@ -109,7 +76,7 @@ pub struct FunctionInterface {
 }
 
 #[no_mangle]
-extern "C" fn function_singleton_create(_func: *mut c_void, func_impl: *mut c_void) -> c_int {
+extern "C" fn function_singleton_create(_func: *mut c_void, _func_impl: *mut c_void) -> c_int {
     0
 }
 
@@ -121,10 +88,10 @@ extern "C" fn function_singleton_invoke(
     size: usize,
 ) -> *mut c_void {
     unsafe {
-        let payload = Box::from_raw(func_impl as *mut Payload);
-        let func: fn(*mut *mut c_void, usize) -> *mut c_void = std::mem::transmute_copy(&(*payload.func));
-        let result =  func(args_p, size);
-        std::mem::forget(payload);
+        let func_ptr = Box::from_raw(func_impl as *mut unsafe fn());
+        let func: fn(*mut *mut c_void, usize) -> *mut c_void = std::mem::transmute_copy(&*func_ptr);
+        let result = func(args_p, size);
+        std::mem::forget(func_ptr);
         result
     }
 }
@@ -146,10 +113,9 @@ extern "C" fn function_singleton_await(
 #[no_mangle]
 extern "C" fn function_singleton_destroy(_func: *mut c_void, func_impl: *mut c_void) {
     unsafe {
-        let payload = Box::from_raw(func_impl as *mut Payload);
-        drop(payload);
+        let func_ptr = Box::from_raw(func_impl as *mut *mut c_void);
+        drop(func_ptr);
     }
-    // Here we have to free the memory of this: https://github.com/metacall/core/blob/44564a0a183a121eec4a55bcb433d52a308e5e9d/source/loaders/rs_loader/rust/compiler/src/registrator.rs#L19
 }
 
 #[no_mangle]
@@ -194,7 +160,6 @@ pub enum PrimitiveMetacallProtocolTypes {
     Class = 15,
     Object = 16,
 }
-
 pub fn define_type(
     loader_impl: *mut c_void,
     name: &str,
