@@ -108,17 +108,3 @@ impl Wrapper for Vec {
         FunctionParameter { ..self.ty.clone() }
     }
 }
-
-/*
-#[no_mangle]
-fn metacall_vec(vec0: *mut c_void) -> *mut c_void {
-    let arr0 = metacall_value_to_array(vec0);
-    let count0 = value_type_count(vec0);
-    let r_vec0: Vec<i32> =
-        std::slice::from_raw_parts(arr0, count0 as usize)
-        .iter()
-        .map(|p| metacall_value_to_int(*p))
-        .collect();
-    let metacall_res = sum(r_vec0, );
-    metacall_res as *mut c_void
-} */

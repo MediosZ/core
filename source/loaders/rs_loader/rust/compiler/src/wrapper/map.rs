@@ -85,21 +85,3 @@ impl Wrapper for Map {
         FunctionParameter { ..self.ty.clone() }
     }
 }
-
-/*
-#[no_mangle]
-fn metacall_map(map0: *mut c_void) -> *mut c_void {
-    let m_map0 = metacall_value_to_map(map0);
-    let count_0 = value_type_count(map0);
-    let m_map0 = std::slice::from_raw_parts(m_map0, count0 as usize);
-    let mut r_map0: HashMap<value_to_rust_type{0}, value_to_rust_type{1}> = HashMap::new();
-    for map_value in m_map0 {
-        let m_pair = metacall_value_to_array(map_value);
-        let m_pair = std::slice::from_raw_parts(m_pair, 2);
-        let key = value_to_type(ty)(m_pair[0]);
-        let val = value_to_type(ty)(m_pair[1]);
-        r_map0.insert(key, val);
-    }
-    let metacall_res = call_map(r_map0, );
-    metacall_res as *mut c_void
-} */

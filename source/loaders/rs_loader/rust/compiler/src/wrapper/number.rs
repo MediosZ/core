@@ -38,7 +38,11 @@ impl Wrapper for Number {
     }
 
     fn handle_ret(&self, ret_name: &str) -> String {
-        format!("{}({})", value_create_type(&self.ty.ty), ret_name)
+        format!(
+            "{}({}.try_into().unwrap())",
+            value_create_type(&self.ty.ty),
+            ret_name
+        )
     }
     fn get_args_type(&self) -> FunctionParameter {
         FunctionParameter {
@@ -51,11 +55,3 @@ impl Wrapper for Number {
         FunctionParameter { ..self.ty.clone() }
     }
 }
-
-/*
-#[no_mangle]
-fn metacall_number(num0: *mut c_void) -> *mut c_void {
-    let r_num0 = metacall_value_to_int(num0);
-    let metacall_res = number(r_num0, );
-    metacall_res as *mut c_void
-} */
