@@ -1,8 +1,8 @@
 mod array;
+mod class;
 mod map;
 mod number;
 mod string;
-
 use crate::Function;
 
 use super::{
