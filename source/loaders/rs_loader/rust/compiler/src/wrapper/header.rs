@@ -1,5 +1,5 @@
 use std::{
-    ffi::{c_void, CStr, CString},
+    ffi::{CStr, CString},
     os::raw::{c_char, c_double, c_float, c_int, c_long, c_short},
 };
 extern "C" {

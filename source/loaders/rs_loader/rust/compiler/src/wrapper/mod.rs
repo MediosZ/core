@@ -1,5 +1,5 @@
 mod array;
-mod class;
+pub mod class;
 mod map;
 mod number;
 mod string;
@@ -221,11 +221,33 @@ fn read_file(file_name: &str) -> std::io::Result<String> {
     Ok(ret)
 }
 
+static temp_class: &str = r#"#[no_mangle]
+unsafe fn matecall_register_class_Book() -> *mut Class {
+    let class = Class::builder::<Book>()
+        .set_constructor(Book::new)
+        .add_attribute_getter("price", |f| f.price)
+        .add_method("get_price", Book::get_price)
+        .add_class_method("get_number", Book::get_number)
+        .build();
+    Box::into_raw(Box::new(class))
+}
+"#;
+
+fn generate_class_wrapper(classes: &Vec<crate::Class>) -> String {
+    let mut ret = String::new();
+    ret.push_str("#[no_mangle]\npub unsafe fn register_all_classes(host_ptr: *mut Host){");
+    ret.push_str("let mut host = Box::from_raw(host_ptr);");
+    ret.push_str("std::mem::forget(host);");
+    ret.push_str("}");
+    ret
+}
+
 pub fn generate_wrapper(callbacks: CompilerCallbacks) -> std::io::Result<CompilerCallbacks> {
     let mut wrapped_functions: Vec<Function> = vec![];
     let mut content = String::new();
 
     content.push_str(read_file("header.rs")?.as_str());
+    content.push_str(read_file("class.rs")?.as_str());
 
     for func in callbacks.functions.iter() {
         let wrapper_func = WrapperFunction::new(func);
@@ -245,6 +267,10 @@ pub fn generate_wrapper(callbacks: CompilerCallbacks) -> std::io::Result<Compile
         }
         wrapped_functions.push(new_function);
     }
+    let class_wrapper = generate_class_wrapper(&callbacks.classes);
+    content.push_str(temp_class);
+    // dbg!(&class_wrapper);
+    // content.push_str(class_wrapper.as_str());
     match callbacks.source.input.0 {
         Input::File(input_path) => {
             // generate wrappers to a file source_wrapper.rs

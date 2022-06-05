@@ -6,6 +6,7 @@ use std::{
 
 pub struct LoaderLifecycleState {
     pub execution_paths: Vec<PathBuf>,
+    pub host: Host,
 }
 impl LoaderLifecycleState {
     pub fn new(execution_paths: Vec<PathBuf>) -> LoaderLifecycleState {
@@ -56,7 +57,6 @@ extern "C" {
     fn loader_impl_type(loader_impl: *mut c_void, name: *const c_char) -> *mut c_void;
 
     fn scope_define(scope: *mut c_void, key: *mut c_char, value: *mut c_void) -> c_int;
-
 }
 
 #[repr(C)]

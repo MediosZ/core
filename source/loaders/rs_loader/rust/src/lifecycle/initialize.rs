@@ -1,4 +1,4 @@
-use api::{self, PrimitiveMetacallProtocolTypes};
+use compiler::api::{self, PrimitiveMetacallProtocolTypes};
 
 use std::os::raw::{c_int, c_void};
 

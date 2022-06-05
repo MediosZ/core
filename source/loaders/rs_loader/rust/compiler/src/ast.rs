@@ -3,7 +3,7 @@ use super::rustc_ast::{
 };
 use super::{Function, FunctionParameter, FunctionType, Mutability, Reference};
 
-fn handle_ty(ty: &rustc_ast::Ty) -> FunctionParameter {
+pub fn handle_ty(ty: &rustc_ast::Ty) -> FunctionParameter {
     let mut result = FunctionParameter {
         name: String::new(),
         mutability: Mutability::No,

@@ -1,14 +1,19 @@
 // use anyhow::Result;
 // use impl_trait_for_tuples::*;
 use std::any::*;
+use std::cell::Ref;
+use std::cell::RefCell;
+use std::cell::RefMut;
 use std::collections::HashMap;
 use std::fmt;
+use std::ops::Deref;
 use std::os::raw::c_void;
 use std::sync::Arc;
 
 type Result<T, E = i32> = core::result::Result<T, E>;
 
 type Attributes = HashMap<&'static str, AttributeGetter>;
+type AttributeSetters = HashMap<&'static str, AttributeSetter>;
 type ClassMethods = HashMap<&'static str, ClassMethod>;
 type InstanceMethods = HashMap<&'static str, InstanceMethod>;
 pub type MetacallValue = *mut c_void;
@@ -20,6 +25,7 @@ pub struct Class {
     pub type_id: TypeId,
     constructor: Option<Constructor>,
     attributes: Attributes,
+    attr_setters: AttributeSetters,
     instance_methods: InstanceMethods,
     pub class_methods: ClassMethods,
 }
@@ -63,6 +69,7 @@ where
                 name: short_name.to_string(),
                 constructor: None,
                 attributes: Attributes::new(),
+                attr_setters: AttributeSetters::new(),
                 instance_methods: InstanceMethods::new(),
                 class_methods: ClassMethods::new(),
                 type_id: TypeId::of::<T>(),
@@ -88,6 +95,18 @@ where
         T: 'static,
     {
         self.class.attributes.insert(name, AttributeGetter::new(f));
+        self
+    }
+
+    pub fn add_attribute_setter<F, Arg>(mut self, name: &'static str, f: F) -> Self
+    where
+        Arg: FromMeta,
+        F: Fn(Arg, &mut T) + 'static,
+        T: 'static,
+    {
+        self.class
+            .attr_setters
+            .insert(name, AttributeSetter::new(f));
         self
     }
 
@@ -136,7 +155,7 @@ where
 }
 #[derive(Clone)]
 pub struct Instance {
-    inner: Arc<dyn std::any::Any + Send + Sync>,
+    inner: Arc<RefCell<dyn std::any::Any + Send + Sync>>,
 
     /// The type name of the Instance, to be used for debugging purposes only.
     /// To get the registered name, use `Instance::name`.
@@ -153,7 +172,7 @@ impl Instance {
     /// Create a new instance
     pub fn new<T: Send + Sync + 'static>(instance: T) -> Self {
         Self {
-            inner: Arc::new(instance),
+            inner: Arc::new(RefCell::new(instance)),
             debug_type_name: std::any::type_name::<T>(),
         }
     }
@@ -181,14 +200,13 @@ impl Instance {
     }
 
     /// Lookup an attribute on the instance via the registered `Class`
-    pub fn get_attr(&self, name: &str, host: &Host) -> Result<MetacallValue> {
-        let attr = self
-            .class(host)
-            .and_then(|c| Ok(c.attributes.get(name)))
-            .unwrap()
-            .unwrap()
-            .clone();
-        attr.invoke(self, host)
+    pub fn get_attr(&self, name: &str, class: &Class) -> Result<MetacallValue> {
+        let attr = class.attributes.get(name).unwrap().clone();
+        attr.invoke(self)
+    }
+    pub fn set_attr(&mut self, name: &str, value: MetacallValue, class: &Class) {
+        let attr = class.attr_setters.get(name).unwrap().clone();
+        attr.invoke(value, self)
     }
     /// Attempt to downcast the inner type of the instance to a reference to the type `T`
     /// This should be the _only_ place using downcast to avoid mistakes.
@@ -196,21 +214,33 @@ impl Instance {
     /// # Arguments
     ///
     /// * `host`: Pass host if possible to improve error handling.
-    pub fn downcast<T: 'static>(&self, host: Option<&Host>) -> Result<&T> {
-        let _name = host
-            .map(|h| self.name(h).to_owned())
-            .unwrap_or_else(|| self.debug_type_name.to_owned());
-
-        let _expected_name = host
-            .and_then(|h| {
-                h.get_class_by_type_id(std::any::TypeId::of::<T>())
-                    .map(|class| class.name.clone())
-                    .ok()
-            })
-            .unwrap_or_else(|| std::any::type_name::<T>().to_owned());
-
-        Ok(self.inner.as_ref().downcast_ref().unwrap())
+    // impl Foo {
+    //     pub fn get_items(&self) -> impl Deref<Target = Vec<i32>> + '_ {
+    //         Ref::map(self.interior.borrow(), |mi| &mi.vec)
+    //     }
+    // }
+    pub fn borrow(&self) -> Ref<dyn std::any::Any + Send + Sync> {
+        self.inner.as_ref().borrow()
+        // let r = self.inner.as_ref().borrow();
+        // Ref::map(self.inner.as_ref().borrow(), |re| &re)
     }
+
+    pub fn borrow_mut(&self) -> RefMut<dyn std::any::Any + Send + Sync> {
+        self.inner.as_ref().borrow_mut()
+        // let r = self.inner.as_ref().borrow();
+        // Ref::map(self.inner.as_ref().borrow(), |re| &re)
+    }
+
+    // pub fn downcast_mut<T: 'static>(
+    //     &self,
+    //     host: Option<&Host>,
+    // ) -> Ref<dyn std::any::Any + Send + Sync> {
+    //     // let receiver = self.inner.as_ref().borrow_mut().downcast_mut().unwrap();
+    //     // Ok(receiver)
+    //     // let r = self.inner.as_ref().borrow();
+    //     // Ref::map(r, |re| &Ok(re.downcast_mut().unwrap()))
+    //     self.inner.as_ref().borrow()
+    // }
 
     pub fn call(&self, name: &str, args: Vec<MetacallValue>, host: &Host) -> Result<MetacallValue> {
         let method = self
@@ -323,7 +353,8 @@ impl InstanceMethod {
     {
         Self(Arc::new(
             move |receiver: &Instance, args: Vec<MetacallValue>, host: &Host| {
-                let receiver = receiver.downcast(Some(host));
+                let borrowed_receiver = receiver.borrow();
+                let receiver = Ok(borrowed_receiver.downcast_ref::<T>().unwrap());
 
                 let args = Args::from_meta_list(&args);
 
@@ -1021,7 +1052,7 @@ impl<
 // }
 
 #[derive(Clone)]
-pub struct AttributeGetter(Arc<dyn Fn(&Instance, &Host) -> Result<MetacallValue> + Send + Sync>);
+pub struct AttributeGetter(Arc<dyn Fn(&Instance) -> Result<MetacallValue> + Send + Sync>);
 impl AttributeGetter {
     pub fn new<T, F, R>(f: F) -> Self
     where
@@ -1029,16 +1060,59 @@ impl AttributeGetter {
         F: Fn(&T) -> R + Send + Sync + 'static,
         R: ToMetaResult,
     {
-        Self(Arc::new(move |receiver, host: &Host| {
-            let receiver = receiver.downcast(Some(host));
+        Self(Arc::new(move |receiver| {
+            let borrowed_receiver = receiver.borrow();
+            let receiver = Ok(borrowed_receiver.downcast_ref::<T>().unwrap());
             receiver.map(&f).and_then(|v| v.to_meta_result())
         }))
     }
 
-    pub fn invoke(&self, receiver: &Instance, host: &Host) -> Result<MetacallValue> {
-        self.0(receiver, host)
+    pub fn invoke(&self, receiver: &Instance) -> Result<MetacallValue> {
+        self.0(receiver)
     }
 }
+
+#[derive(Clone)]
+pub struct AttributeSetter(Arc<dyn Fn(MetacallValue, &mut Instance)>);
+impl AttributeSetter {
+    pub fn new<T, F, Arg>(f: F) -> Self
+    where
+        T: 'static,
+        Arg: FromMeta,
+        F: Fn(Arg, &mut T) + 'static,
+    {
+        Self(Arc::new(move |value, receiver| {
+            let mut borrowed_receiver = receiver.borrow_mut();
+            let receiver = borrowed_receiver.downcast_mut::<T>().unwrap();
+            f(FromMeta::from_meta(value).unwrap(), receiver)
+        }))
+    }
+
+    pub fn invoke(&self, value: MetacallValue, receiver: &mut Instance) {
+        self.0(value, receiver)
+    }
+}
+
+/*
+#[derive(Clone)]
+pub struct ClassMethod(TypeErasedFunction<MetacallValue>);
+
+impl ClassMethod {
+    pub fn new<F, Args>(f: F) -> Self
+    where
+        Args: FromMetaList,
+        F: Function<Args>,
+        F::Result: ToMetaResult,
+    {
+        Self(Arc::new(move |args: Vec<MetacallValue>| {
+            Args::from_meta_list(&args).and_then(|args| f.invoke(args).to_meta_result())
+        }))
+    }
+
+    pub fn invoke(&self, args: Vec<MetacallValue>) -> Result<MetacallValue> {
+        self.0(args)
+    }
+} */
 
 fn metaclass() -> Class {
     Class::builder::<Class>()
@@ -1149,14 +1223,18 @@ mod tests {
             fn x_plus_y(&self, y: u32) -> u32 {
                 self.x + y
             }
+            fn set_x(&mut self, x: u32) {
+                self.x = x;
+            }
             fn get_number() -> u32 {
                 123
             }
         }
         // register the class
-        let class = Class::builder::<Foo>()
+        let foo_class = Class::builder::<Foo>()
             .set_constructor(Foo::new)
             .add_attribute_getter("x", |f| f.x)
+            .add_attribute_setter("y", |val, f| f.y = val)
             .add_attribute_getter("y", |f| f.y)
             .add_method("x_plus_y", Foo::x_plus_y)
             .add_class_method("get_number", Foo::get_number)
@@ -1166,27 +1244,31 @@ mod tests {
         // ----
 
         //caller side
-        host.cache_class(class, "Foo".to_string())?;
-        host.make_instance(
-            "Foo",
-            vec![32 as MetacallValue, -12 as i32 as MetacallValue],
-            1,
-        )?;
-        let foo_instance = host.get_instance(1)?;
+        // host.cache_class(class, "Foo".to_string())?;
+        // host.make_instance(
+        //     "Foo",
+        //     vec![32 as MetacallValue, -12 as i32 as MetacallValue],
+        //     1,
+        // )?;
         // ----
 
-        let x = foo_instance.get_attr("x", &host)?;
-        let y = foo_instance.get_attr("y", &host)?;
-        let res = foo_instance.call("x_plus_y", vec![10 as MetacallValue], &host)?;
-
-        let foo_class = host.get_class("Foo")?;
+        // let foo_class = host.get_class("Foo")?;
+        let mut foo_instance =
+            foo_class.init(vec![32 as MetacallValue, -12 as i32 as MetacallValue]);
+        let x = foo_instance.get_attr("x", &foo_class)?;
+        let y = foo_instance.get_attr("y", &foo_class)?;
+        println!("{} : {}", x as u32, y as i32);
+        foo_instance.set_attr("y", 100 as MetacallValue, &foo_class);
+        // let res = foo_instance.call("x_plus_y", vec![10 as MetacallValue], &host)?;
+        let y = foo_instance.get_attr("y", &foo_class)?;
+        // println!("{} : {}", x as u32, y as i32);
         let num = foo_class.call("get_number", vec![])?;
         assert_eq!(123, num as u32);
         assert_eq!(32, x as u32);
-        assert_eq!(-12, y as i32);
-        assert_eq!(42, res as u32);
+        assert_eq!(100, y as i32);
+        // assert_eq!(42, res as u32);
         println!("get_number: {}", num as u32);
-        println!("{} : {} : {}", x as u32, y as i32, res as u32);
+        // println!("{} : {} : {}", x as u32, y as i32, res as u32);
 
         Ok(())
     }

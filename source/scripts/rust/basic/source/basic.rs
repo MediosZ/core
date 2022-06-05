@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+// use std::collections::HashMap;
 #[no_mangle]
 pub extern "C" fn add(num_1: i32, num_2: i32) -> i32 {
     num_1 + num_2
@@ -29,19 +29,19 @@ pub fn return_vec() -> Vec<i32> {
     vec![1, 2, 3, 4, 5]
 }
 
-#[no_mangle]
-pub fn return_map() -> HashMap<i32, f32> {
-    let mut map = HashMap::new();
-    map.insert(1, 1.0);
-    map.insert(2, 2.0);
-    map.insert(3, 3.0);
-    map
-}
+// #[no_mangle]
+// pub fn return_map() -> HashMap<i32, f32> {
+//     let mut map = HashMap::new();
+//     map.insert(1, 1.0);
+//     map.insert(2, 2.0);
+//     map.insert(3, 3.0);
+//     map
+// }
 
-#[no_mangle]
-pub fn add_map(map: HashMap<i32, f32>) -> f32 {
-    map.into_values().sum()
-}
+// #[no_mangle]
+// pub fn add_map(map: HashMap<i32, f32>) -> f32 {
+//     map.into_values().sum()
+// }
 
 #[no_mangle]
 pub fn string_len(s: String) -> usize {
@@ -55,17 +55,20 @@ pub fn new_string(idx: i32) -> String {
 
 #[repr(C)]
 struct Book {
-    name: String,
     price: u32,
 }
 
 impl Book {
-    fn new(name: String, price: u32) -> Self {
-        Self { name, price }
+    fn new(price: u32) -> Self {
+        Self { price }
     }
     fn get_price(&self) -> u32 {
         self.price
     }
+    fn get_number() -> i32 {
+        123
+    }
+    fn null() {}
 }
 
 impl Drop for Book {
