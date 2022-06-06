@@ -64,6 +64,45 @@ TEST_F(metacall_rust_class_test, DefaultConstructor)
 		ASSERT_EQ((enum metacall_value_id)METACALL_INT, (enum metacall_value_id)metacall_value_id(ret_value));
 		ASSERT_EQ((int)123, (int)metacall_value_to_int(ret_value));
 		metacall_value_destroy(ret_value);
+		// metacall_value_destroy(book_class);
+	}
+
+	{
+		void *book_class = metacall_class("Book");
+		ASSERT_NE((void *)NULL, (void *)book_class);
+
+		void *constructor_params[] = {
+			metacall_value_create_int(111) // param1
+		};
+		void *new_object_v = metacall_class_new(book_class, "book_one", constructor_params, sizeof(constructor_params) / sizeof(constructor_params[0]));
+		metacall_value_destroy(constructor_params[0]);
+		void *new_object = metacall_value_to_object(new_object_v);
+
+		void *ret = metacallv_object(new_object, "get_price", nullptr, 0);
+		ASSERT_EQ((enum metacall_value_id)METACALL_INT, (enum metacall_value_id)metacall_value_id(ret));
+		ASSERT_EQ((int)111, (int)metacall_value_to_int(ret));
+
+		// void *param2 = metacall_object_get(new_object, "price");
+		// ASSERT_EQ((enum metacall_value_id)METACALL_INT, (enum metacall_value_id)metacall_value_id(param2));
+		// ASSERT_EQ((int)111, (int)metacall_value_to_int(param2));
+
+		// metacall_value_destroy(param2);
+
+		// void *long_value = metacall_value_create_long(124124L);
+		// int retcode = metacall_object_set(new_object, "b", long_value);
+		// metacall_value_destroy(long_value);
+		// ASSERT_EQ((int)0, int(retcode));
+
+		// param2 = metacall_object_get(new_object, "b");
+		// ASSERT_EQ((enum metacall_value_id)METACALL_LONG, (enum metacall_value_id)metacall_value_id(param2));
+		// ASSERT_EQ((long)124124L, (long)metacall_value_to_long(param2));
+
+		// metacall_value_destroy(param2);
+
+		metacall_value_destroy(new_object_v);
+		metacall_value_destroy(ret);
+		// metacall_value_destroy(myclass_value);
+		// metacall_value_destroy(book_class);
 	}
 
 	EXPECT_EQ((int)0, (int)metacall_destroy());

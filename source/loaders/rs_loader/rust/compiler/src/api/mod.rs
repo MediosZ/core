@@ -110,6 +110,13 @@ extern "C" {
     fn class_register_method(class: OpaqueType, method: OpaqueType) -> c_int;
     fn method_signature(method: OpaqueType) -> OpaqueType;
     fn method_name(method: OpaqueType) -> *mut c_char;
+    fn object_create(
+        name: *const c_char,
+        accessor_id: c_int,
+        object_impl: OpaqueType,
+        singleton: OpaqueType,
+        class: OpaqueType,
+    ) -> OpaqueType;
 
 }
 

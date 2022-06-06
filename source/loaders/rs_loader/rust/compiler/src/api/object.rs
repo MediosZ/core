@@ -1,6 +1,8 @@
+use crate::wrapper::class::{Class, Instance};
+
 use super::*;
 use std::{
-    ffi::{c_void, CString},
+    ffi::{c_void, CStr, CString},
     os::raw::{c_char, c_int},
 };
 #[repr(C)]
@@ -13,12 +15,19 @@ pub struct ObjectInterface {
         extern "C" fn(OpaqueType, OpaqueType, OpaqueType, OpaqueTypeList, usize) -> OpaqueType,
     method_await:
         extern "C" fn(OpaqueType, OpaqueType, OpaqueType, OpaqueTypeList, usize) -> OpaqueType,
-    destructor: extern "C" fn(OpaqueType, OpaqueType),
+    destructor: extern "C" fn(OpaqueType, OpaqueType) -> c_int,
     destroy: extern "C" fn(OpaqueType, OpaqueType),
+}
+
+#[repr(C)]
+pub struct Object {
+    pub instance: Instance,
+    pub class: *mut Class,
 }
 
 #[no_mangle]
 extern "C" fn object_singleton_create(_object: OpaqueType, _object_impl: OpaqueType) -> c_int {
+    println!("object create");
     0
 }
 
@@ -29,6 +38,7 @@ extern "C" fn object_singleton_set(
     _accessor: OpaqueType,
     _value: OpaqueType,
 ) -> c_int {
+    println!("object set");
     0
 }
 
@@ -38,18 +48,39 @@ extern "C" fn object_singleton_get(
     _object_impl: OpaqueType,
     _accessor: OpaqueType,
 ) -> OpaqueType {
+    println!("object get");
     0 as OpaqueType
 }
 
 #[no_mangle]
 extern "C" fn object_singleton_method_invoke(
     _object: OpaqueType,
-    _object_impl: OpaqueType,
-    _method: OpaqueType,
-    _args_p: OpaqueTypeList,
-    _size: usize,
+    object_impl: OpaqueType,
+    method: OpaqueType,
+    args_p: OpaqueTypeList,
+    size: usize,
 ) -> OpaqueType {
-    0 as OpaqueType
+    let ret = unsafe {
+        let object_impl_ptr = object_impl as *mut object::Object;
+        let obj = Box::from_raw(object_impl_ptr);
+        let class = Box::from_raw(obj.class);
+        let args = std::slice::from_raw_parts(args_p, size).to_vec();
+        let name = CStr::from_ptr(method_name(method))
+            .to_str()
+            .expect("Unable to get method name");
+        println!("object invoke: {}", name);
+        let ret = obj.instance.call(name, args, &class);
+
+        std::mem::forget(class);
+        std::mem::forget(obj);
+        std::mem::forget(name);
+        ret
+    };
+    if let Ok(ret) = ret {
+        return ret;
+    } else {
+        return 0 as OpaqueType;
+    }
 }
 
 #[no_mangle]
@@ -60,12 +91,23 @@ extern "C" fn object_singleton_method_await(
     _args_p: OpaqueTypeList,
     _size: usize,
 ) -> OpaqueType {
+    println!("object await");
     0 as OpaqueType
 }
 #[no_mangle]
-extern "C" fn object_singleton_destructor(_object: OpaqueType, _object_impl: OpaqueType) {}
+extern "C" fn object_singleton_destructor(_object: OpaqueType, object_impl: OpaqueType) -> c_int {
+    unsafe {
+        let object_impl_ptr = object_impl as *mut Object;
+        let object = Box::from_raw(object_impl_ptr);
+        drop(object);
+    }
+    println!("object destruct");
+    0
+}
 #[no_mangle]
-extern "C" fn object_singleton_destroy(_object: OpaqueType, _object_impl: OpaqueType) {}
+extern "C" fn object_singleton_destroy(_object: OpaqueType, _object_impl: OpaqueType) {
+    println!("object destroy");
+}
 
 #[no_mangle]
 pub extern "C" fn object_singleton() -> *const ObjectInterface {

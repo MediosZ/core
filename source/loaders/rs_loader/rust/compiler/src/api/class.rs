@@ -1,6 +1,8 @@
+use super::object::{object_singleton, Object};
 use super::*;
 use crate::wrapper::class;
 use crate::Class;
+
 use std::{
     ffi::{c_void, CStr, CString},
     os::raw::{c_char, c_int},
@@ -11,7 +13,7 @@ pub struct ClassInterface {
     constructor: extern "C" fn(
         OpaqueType,
         OpaqueType,
-        *const char,
+        *const c_char,
         OpaqueType,
         OpaqueTypeList,
         usize,
@@ -32,15 +34,28 @@ extern "C" fn class_singleton_create(_klass: OpaqueType, _class_impl: OpaqueType
 }
 #[no_mangle]
 extern "C" fn class_singleton_constructor(
-    _klass: OpaqueType,
-    _class_impl: OpaqueType,
-    _name: *const char,
+    klass: OpaqueType,
+    class_impl: OpaqueType,
+    name: *const c_char,
     _constructor: OpaqueType,
-    _class_args: OpaqueTypeList,
-    _size_t: usize,
+    class_args: OpaqueTypeList,
+    size: usize,
 ) -> OpaqueType {
     println!("invoke class constructor");
-    0 as OpaqueType
+    // create a obj and return that
+    unsafe {
+        let class_impl_ptr = class_impl as *mut class::Class;
+        let class = Box::from_raw(class_impl_ptr);
+        let args = std::slice::from_raw_parts(class_args, size).to_vec();
+        let instance = class.init(args);
+        let obj_impl = Object {
+            instance,
+            class: class_impl_ptr,
+        };
+        std::mem::forget(class);
+        let obj_impl_ptr = Box::into_raw(Box::new(obj_impl)) as OpaqueType;
+        object_create(name, 0, obj_impl_ptr, object_singleton as OpaqueType, klass)
+    }
 }
 #[no_mangle]
 extern "C" fn class_singleton_static_set(

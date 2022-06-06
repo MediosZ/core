@@ -242,11 +242,14 @@ impl Instance {
     //     self.inner.as_ref().borrow()
     // }
 
-    pub fn call(&self, name: &str, args: Vec<MetacallValue>, host: &Host) -> Result<MetacallValue> {
-        let method = self
-            .class(host)
-            .and_then(|c| Ok(c.get_method(name).unwrap()))?;
-        method.invoke(self, args, host)
+    pub fn call(
+        &self,
+        name: &str,
+        args: Vec<MetacallValue>,
+        class: &Class,
+    ) -> Result<MetacallValue> {
+        let method = class.get_method(name).unwrap();
+        method.invoke(self, args)
     }
 }
 
@@ -317,8 +320,7 @@ fn join<A, B>(left: Result<A>, right: Result<B>) -> Result<(A, B)> {
 }
 
 type TypeErasedFunction<R> = Arc<dyn Fn(Vec<MetacallValue>) -> Result<R> + Send + Sync>;
-type TypeErasedMethod<R> =
-    Arc<dyn Fn(&Instance, Vec<MetacallValue>, &Host) -> Result<R> + Send + Sync>;
+type TypeErasedMethod<R> = Arc<dyn Fn(&Instance, Vec<MetacallValue>) -> Result<R> + Send + Sync>;
 
 #[derive(Clone)]
 pub struct Constructor(TypeErasedFunction<Instance>);
@@ -352,7 +354,7 @@ impl InstanceMethod {
         T: 'static,
     {
         Self(Arc::new(
-            move |receiver: &Instance, args: Vec<MetacallValue>, host: &Host| {
+            move |receiver: &Instance, args: Vec<MetacallValue>| {
                 let borrowed_receiver = receiver.borrow();
                 let receiver = Ok(borrowed_receiver.downcast_ref::<T>().unwrap());
 
@@ -364,13 +366,8 @@ impl InstanceMethod {
         ))
     }
 
-    pub fn invoke(
-        &self,
-        receiver: &Instance,
-        args: Vec<MetacallValue>,
-        host: &Host,
-    ) -> Result<MetacallValue> {
-        self.0(receiver, args, host)
+    pub fn invoke(&self, receiver: &Instance, args: Vec<MetacallValue>) -> Result<MetacallValue> {
+        self.0(receiver, args)
     }
 }
 
@@ -1226,6 +1223,9 @@ mod tests {
             fn x_plus_y(&self, y: u32) -> u32 {
                 self.x + y
             }
+            fn get_price(&self) -> i32 {
+                self.y
+            }
             fn set_x(&mut self, x: u32) {
                 self.x = x;
             }
@@ -1240,6 +1240,7 @@ mod tests {
             .add_attribute_setter("y", |val, f| f.y = val)
             .add_attribute_getter("y", |f| f.y)
             .add_method("x_plus_y", Foo::x_plus_y)
+            .add_method("get_price", Foo::get_price)
             .add_class_method("get_number", Foo::get_number)
             .build();
         // this should call register class in caller side.
@@ -1263,14 +1264,16 @@ mod tests {
         println!("{} : {}", x as u32, y as i32);
         foo_instance.set_attr("y", 100 as MetacallValue, &foo_class);
         // let res = foo_instance.call("x_plus_y", vec![10 as MetacallValue], &host)?;
-        let y = foo_instance.get_attr("y", &foo_class)?;
-        // println!("{} : {}", x as u32, y as i32);
-        let num = foo_class.call("get_number", vec![])?;
-        assert_eq!(123, num as u32);
-        assert_eq!(32, x as u32);
-        assert_eq!(100, y as i32);
-        // assert_eq!(42, res as u32);
-        println!("get_number: {}", num as u32);
+        let res = foo_instance.call("get_price", vec![], &foo_class)?;
+        println!("{} : ", res as i32);
+        // let y = foo_instance.get_attr("y", &foo_class)?;
+        // // println!("{} : {}", x as u32, y as i32);
+        // let num = foo_class.call("get_number", vec![])?;
+        // assert_eq!(123, num as u32);
+        // assert_eq!(32, x as u32);
+        // assert_eq!(100, y as i32);
+        // // assert_eq!(42, res as u32);
+        // println!("get_number: {}", num as u32);
         // println!("{} : {} : {}", x as u32, y as i32, res as u32);
 
         Ok(())

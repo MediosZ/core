@@ -40,9 +40,8 @@ impl Class {
     }
 
     pub fn call(&self, attr: &str, args: Vec<MetacallValue>) -> Result<MetacallValue> {
-        println!("about to get static method");
         let attr = self.class_methods.get(attr).unwrap();
-        println!("get static method");
+
         attr.clone().invoke(args)
     }
 
@@ -243,11 +242,14 @@ impl Instance {
     //     self.inner.as_ref().borrow()
     // }
 
-    pub fn call(&self, name: &str, args: Vec<MetacallValue>, host: &Host) -> Result<MetacallValue> {
-        let method = self
-            .class(host)
-            .and_then(|c| Ok(c.get_method(name).unwrap()))?;
-        method.invoke(self, args, host)
+    pub fn call(
+        &self,
+        name: &str,
+        args: Vec<MetacallValue>,
+        class: &Class,
+    ) -> Result<MetacallValue> {
+        let method = class.get_method(name).unwrap();
+        method.invoke(self, args)
     }
 }
 
@@ -318,8 +320,7 @@ fn join<A, B>(left: Result<A>, right: Result<B>) -> Result<(A, B)> {
 }
 
 type TypeErasedFunction<R> = Arc<dyn Fn(Vec<MetacallValue>) -> Result<R> + Send + Sync>;
-type TypeErasedMethod<R> =
-    Arc<dyn Fn(&Instance, Vec<MetacallValue>, &Host) -> Result<R> + Send + Sync>;
+type TypeErasedMethod<R> = Arc<dyn Fn(&Instance, Vec<MetacallValue>) -> Result<R> + Send + Sync>;
 
 #[derive(Clone)]
 pub struct Constructor(TypeErasedFunction<Instance>);
@@ -353,7 +354,7 @@ impl InstanceMethod {
         T: 'static,
     {
         Self(Arc::new(
-            move |receiver: &Instance, args: Vec<MetacallValue>, host: &Host| {
+            move |receiver: &Instance, args: Vec<MetacallValue>| {
                 let borrowed_receiver = receiver.borrow();
                 let receiver = Ok(borrowed_receiver.downcast_ref::<T>().unwrap());
 
@@ -365,13 +366,8 @@ impl InstanceMethod {
         ))
     }
 
-    pub fn invoke(
-        &self,
-        receiver: &Instance,
-        args: Vec<MetacallValue>,
-        host: &Host,
-    ) -> Result<MetacallValue> {
-        self.0(receiver, args, host)
+    pub fn invoke(&self, receiver: &Instance, args: Vec<MetacallValue>) -> Result<MetacallValue> {
+        self.0(receiver, args)
     }
 }
 
@@ -394,7 +390,6 @@ impl ClassMethod {
     }
 
     pub fn invoke(&self, args: Vec<MetacallValue>) -> Result<MetacallValue> {
-        println!("before invoke");
         self.0(args)
     }
 }
@@ -412,6 +407,7 @@ impl ToMetaResult for u32 {
 impl ToMetaResult for i32 {
     fn to_meta_result(self) -> Result<MetacallValue> {
         println!("to metacall res mock");
+        println!("{:?}", self);
         Ok(unsafe { metacall_value_create_int(self) })
     }
 }
@@ -438,7 +434,7 @@ impl FromMeta for u32 {
 }
 impl FromMeta for i32 {
     fn from_meta(val: MetacallValue) -> Result<Self> {
-        Ok(val as i32)
+        Ok(unsafe { metacall_value_to_int(val) })
     }
 }
 
