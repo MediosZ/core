@@ -247,7 +247,7 @@ pub fn generate_wrapper(callbacks: CompilerCallbacks) -> std::io::Result<Compile
     let mut content = String::new();
 
     content.push_str(read_file("header.rs")?.as_str());
-    content.push_str(read_file("class.rs")?.as_str());
+    content.push_str(read_file("class_mock.rs")?.as_str());
 
     for func in callbacks.functions.iter() {
         let wrapper_func = WrapperFunction::new(func);

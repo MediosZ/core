@@ -40,8 +40,9 @@ impl Class {
     }
 
     pub fn call(&self, attr: &str, args: Vec<MetacallValue>) -> Result<MetacallValue> {
+        println!("about to get static method");
         let attr = self.class_methods.get(attr).unwrap();
-
+        println!("get static method");
         attr.clone().invoke(args)
     }
 
@@ -393,6 +394,7 @@ impl ClassMethod {
     }
 
     pub fn invoke(&self, args: Vec<MetacallValue>) -> Result<MetacallValue> {
+        println!("before invoke");
         self.0(args)
     }
 }
@@ -409,7 +411,8 @@ impl ToMetaResult for u32 {
 
 impl ToMetaResult for i32 {
     fn to_meta_result(self) -> Result<MetacallValue> {
-        Ok(self as MetacallValue)
+        println!("to metacall res mock");
+        Ok(unsafe { metacall_value_create_int(self) })
     }
 }
 

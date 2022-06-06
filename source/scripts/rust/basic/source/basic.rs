@@ -52,31 +52,3 @@ pub fn string_len(s: String) -> usize {
 pub fn new_string(idx: i32) -> String {
     format!("get number {idx}")
 }
-
-#[repr(C)]
-struct Book {
-    price: u32,
-}
-
-impl Book {
-    fn new(price: u32) -> Self {
-        Self { price }
-    }
-    fn get_price(&self) -> u32 {
-        self.price
-    }
-    fn get_number() -> i32 {
-        123
-    }
-    fn null() {}
-}
-
-impl Drop for Book {
-    fn drop(&mut self) {}
-}
-trait BookTrait {
-    fn buy_book(&self, p: i32);
-}
-impl BookTrait for Book {
-    fn buy_book(&self, p: i32) {}
-}

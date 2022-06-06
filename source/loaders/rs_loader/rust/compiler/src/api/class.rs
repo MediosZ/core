@@ -1,7 +1,8 @@
 use super::*;
+use crate::wrapper::class;
 use crate::Class;
 use std::{
-    ffi::{c_void, CString},
+    ffi::{c_void, CStr, CString},
     os::raw::{c_char, c_int},
 };
 #[repr(C)]
@@ -26,6 +27,7 @@ pub struct ClassInterface {
 
 #[no_mangle]
 extern "C" fn class_singleton_create(_klass: OpaqueType, _class_impl: OpaqueType) -> c_int {
+    println!("create class");
     0
 }
 #[no_mangle]
@@ -37,6 +39,7 @@ extern "C" fn class_singleton_constructor(
     _class_args: OpaqueTypeList,
     _size_t: usize,
 ) -> OpaqueType {
+    println!("invoke class constructor");
     0 as OpaqueType
 }
 #[no_mangle]
@@ -46,27 +49,63 @@ extern "C" fn class_singleton_static_set(
     _accessor: OpaqueType,
     _value: OpaqueType,
 ) -> c_int {
+    println!("class static set");
     0
 }
 
 #[no_mangle]
 extern "C" fn class_singleton_static_get(
     _klass: OpaqueType,
-    _class_impl: OpaqueType,
+    class_impl: OpaqueType,
     _accessor: OpaqueType,
 ) -> OpaqueType {
-    0 as OpaqueType
+    println!("class static get");
+    let ret = unsafe {
+        let class_impl_ptr = class_impl as *mut class::Class;
+        let class = Box::from_raw(class_impl_ptr);
+        // let args = std::slice::from_raw_parts(args_p, size).to_vec();
+        // let name = CStr::from_ptr(method_name(method))
+        //     .to_str()
+        //     .expect("Unable to get method name");
+        // let ret = class.call(name, args);
+        // std::mem::forget(class);
+        // std::mem::forget(name);
+        // ret
+        Err(1)
+    };
+    if let Ok(ret) = ret {
+        return ret;
+    } else {
+        return 0 as OpaqueType;
+    }
 }
 
 #[no_mangle]
 extern "C" fn class_singleton_static_invoke(
     _klass: OpaqueType,
-    _class_impl: OpaqueType,
-    _method: OpaqueType,
-    _args_p: OpaqueTypeList,
-    _size: usize,
+    class_impl: OpaqueType,
+    method: OpaqueType,
+    args_p: OpaqueTypeList,
+    size: usize,
 ) -> OpaqueType {
-    0 as OpaqueType
+    println!("class static invoke");
+    let ret = unsafe {
+        let class_impl_ptr = class_impl as *mut class::Class;
+        let class = Box::from_raw(class_impl_ptr);
+        let args = std::slice::from_raw_parts(args_p, size).to_vec();
+        let name = CStr::from_ptr(method_name(method))
+            .to_str()
+            .expect("Unable to get method name");
+        let ret = class.call(name, args);
+        std::mem::forget(class);
+        std::mem::forget(name);
+        ret
+    };
+    if let Ok(ret) = ret {
+        return ret;
+    } else {
+        return 0 as OpaqueType;
+    }
 }
 
 #[no_mangle]
@@ -77,11 +116,19 @@ extern "C" fn class_singleton_static_await(
     _args_p: OpaqueTypeList,
     _size: usize,
 ) -> OpaqueType {
+    println!("class static await");
     0 as OpaqueType
 }
 
 #[no_mangle]
-extern "C" fn class_singleton_destroy(_klass: OpaqueType, _class_impl: OpaqueType) {}
+extern "C" fn class_singleton_destroy(_klass: OpaqueType, class_impl: OpaqueType) {
+    unsafe {
+        let class_impl_ptr = class_impl as *mut class::Class;
+        let class = Box::from_raw(class_impl_ptr);
+        drop(class);
+    }
+    println!("class destroy");
+}
 
 #[no_mangle]
 pub extern "C" fn class_singleton() -> *const ClassInterface {

@@ -35,20 +35,6 @@ TEST_F(metacall_rust_test, DefaultConstructor)
 
 	ASSERT_EQ((int)0, (int)metacall_initialize());
 
-	// {
-	// 	// Test: Load from memory
-	// 	static const char buffer[] =
-	// 		"#[no_mangle]\n"
-	// 		"pub extern \"C\" fn add2(num_1: i32, num_2: i32) -> i32 {\n"
-	// 		"\tnum_1 + num_2\n"
-	// 		"}";
-
-	// 	EXPECT_EQ((int)0, (int)metacall_load_from_memory("rs", buffer, sizeof(buffer), NULL));
-	// 	void *ret = metacall("metacall_add2", 5, 10);
-	// 	EXPECT_EQ((int)15, (int)metacall_value_to_int(ret));
-	// 	metacall_value_destroy(ret);
-	// }
-
 	EXPECT_EQ((int)0, (int)metacall_load_from_file("rs", rs_scripts, sizeof(rs_scripts) / sizeof(rs_scripts[0]), NULL));
 
 	{

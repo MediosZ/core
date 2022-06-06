@@ -29,6 +29,7 @@ impl LoaderLifecycleState {
     }
 }
 extern "C" {
+    pub fn metacall_value_create_int(i: c_int) -> *mut c_void;
     fn loader_impl_get(loader_impl: OpaqueType) -> OpaqueType;
 
     fn loader_initialization_register(loader_impl: OpaqueType);
@@ -95,6 +96,7 @@ extern "C" {
     ) -> OpaqueType;
     fn class_register_static_attribute(class: OpaqueType, attr: OpaqueType) -> c_int;
     fn class_register_attribute(class: OpaqueType, attr: OpaqueType) -> c_int;
+    fn attribute_name(attr: OpaqueType) -> *mut c_char;
     fn method_create(
         class: OpaqueType,
         name: *const c_char,

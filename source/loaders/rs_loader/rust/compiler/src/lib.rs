@@ -453,6 +453,10 @@ impl<'a> visit::Visitor<'a> for ItemVisitor {
                                                 {
                                                     class.constructor =
                                                         Some(ast::handle_fn(name, sig));
+                                                } else {
+                                                    class
+                                                        .static_methods
+                                                        .push(ast::handle_fn(name, sig));
                                                 }
                                             }
                                             _ => {
