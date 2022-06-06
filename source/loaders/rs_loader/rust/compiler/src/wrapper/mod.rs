@@ -226,6 +226,7 @@ unsafe fn matecall_register_class_Book() -> *mut Class {
     let class = Class::builder::<Book>()
         .set_constructor(Book::new)
         .add_attribute_getter("price", |f| f.price)
+        .add_attribute_setter("price", |val, f| f.price = val)
         .add_method("get_price", Book::get_price)
         .add_class_method("get_number", Book::get_number)
         .build();

@@ -82,22 +82,21 @@ TEST_F(metacall_rust_class_test, DefaultConstructor)
 		ASSERT_EQ((enum metacall_value_id)METACALL_INT, (enum metacall_value_id)metacall_value_id(ret));
 		ASSERT_EQ((int)111, (int)metacall_value_to_int(ret));
 
-		// void *param2 = metacall_object_get(new_object, "price");
-		// ASSERT_EQ((enum metacall_value_id)METACALL_INT, (enum metacall_value_id)metacall_value_id(param2));
-		// ASSERT_EQ((int)111, (int)metacall_value_to_int(param2));
+		void *param2 = metacall_object_get(new_object, "price");
+		ASSERT_EQ((enum metacall_value_id)METACALL_INT, (enum metacall_value_id)metacall_value_id(param2));
+		ASSERT_EQ((int)111, (int)metacall_value_to_int(param2));
 
-		// metacall_value_destroy(param2);
+		metacall_value_destroy(param2);
 
-		// void *long_value = metacall_value_create_long(124124L);
-		// int retcode = metacall_object_set(new_object, "b", long_value);
-		// metacall_value_destroy(long_value);
-		// ASSERT_EQ((int)0, int(retcode));
+		void *int_value = metacall_value_create_int(100);
+		int retcode = metacall_object_set(new_object, "price", int_value);
+		metacall_value_destroy(int_value);
+		ASSERT_EQ((int)0, int(retcode));
 
-		// param2 = metacall_object_get(new_object, "b");
-		// ASSERT_EQ((enum metacall_value_id)METACALL_LONG, (enum metacall_value_id)metacall_value_id(param2));
-		// ASSERT_EQ((long)124124L, (long)metacall_value_to_long(param2));
-
-		// metacall_value_destroy(param2);
+		param2 = metacall_object_get(new_object, "price");
+		ASSERT_EQ((enum metacall_value_id)METACALL_INT, (enum metacall_value_id)metacall_value_id(param2));
+		ASSERT_EQ((int)100, (int)metacall_value_to_int(param2));
+		metacall_value_destroy(param2);
 
 		metacall_value_destroy(new_object_v);
 		metacall_value_destroy(ret);

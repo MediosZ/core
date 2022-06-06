@@ -72,19 +72,23 @@ extern "C" fn class_singleton_static_set(
 extern "C" fn class_singleton_static_get(
     _klass: OpaqueType,
     class_impl: OpaqueType,
-    _accessor: OpaqueType,
+    accessor: OpaqueType,
 ) -> OpaqueType {
     println!("class static get");
     let ret = unsafe {
         let class_impl_ptr = class_impl as *mut class::Class;
         let class = Box::from_raw(class_impl_ptr);
+        let name = CStr::from_ptr(get_attr_name(accessor))
+            .to_str()
+            .expect("Unable to get attr name");
+        println!("get attr: {}", name);
         // let args = std::slice::from_raw_parts(args_p, size).to_vec();
         // let name = CStr::from_ptr(method_name(method))
         //     .to_str()
         //     .expect("Unable to get method name");
         // let ret = class.call(name, args);
-        // std::mem::forget(class);
-        // std::mem::forget(name);
+        std::mem::forget(class);
+        std::mem::forget(name);
         // ret
         Err(1)
     };

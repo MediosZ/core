@@ -34,22 +34,51 @@ extern "C" fn object_singleton_create(_object: OpaqueType, _object_impl: OpaqueT
 #[no_mangle]
 extern "C" fn object_singleton_set(
     _object: OpaqueType,
-    _object_impl: OpaqueType,
-    _accessor: OpaqueType,
-    _value: OpaqueType,
+    object_impl: OpaqueType,
+    accessor: OpaqueType,
+    value: OpaqueType,
 ) -> c_int {
-    println!("object set");
+    unsafe {
+        let object_impl_ptr = object_impl as *mut object::Object;
+        let mut obj = Box::from_raw(object_impl_ptr);
+        let class = Box::from_raw(obj.class);
+        let name = CStr::from_ptr(get_attr_name(accessor))
+            .to_str()
+            .expect("Unable to get attr name");
+        println!("object set attr: {}", name);
+        obj.instance.set_attr(name, value, &class);
+        std::mem::forget(class);
+        std::mem::forget(obj);
+        std::mem::forget(name);
+    };
     0
 }
 
 #[no_mangle]
 extern "C" fn object_singleton_get(
     _object: OpaqueType,
-    _object_impl: OpaqueType,
-    _accessor: OpaqueType,
+    object_impl: OpaqueType,
+    accessor: OpaqueType,
 ) -> OpaqueType {
-    println!("object get");
-    0 as OpaqueType
+    let ret = unsafe {
+        let object_impl_ptr = object_impl as *mut object::Object;
+        let obj = Box::from_raw(object_impl_ptr);
+        let class = Box::from_raw(obj.class);
+        let name = CStr::from_ptr(get_attr_name(accessor))
+            .to_str()
+            .expect("Unable to get attr name");
+        println!("object get attr: {}", name);
+        let ret = obj.instance.get_attr(name, &class);
+        std::mem::forget(class);
+        std::mem::forget(obj);
+        std::mem::forget(name);
+        ret
+    };
+    if let Ok(ret) = ret {
+        return ret;
+    } else {
+        return 0 as OpaqueType;
+    }
 }
 
 #[no_mangle]

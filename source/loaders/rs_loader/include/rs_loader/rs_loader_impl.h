@@ -28,7 +28,8 @@
 #include <configuration/configuration.h>
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 RS_LOADER_API loader_impl_data rs_loader_impl_initialize(loader_impl impl, configuration config);
@@ -46,6 +47,8 @@ RS_LOADER_API int rs_loader_impl_clear(loader_impl impl, loader_handle handle);
 RS_LOADER_API int rs_loader_impl_discover(loader_impl impl, loader_handle handle, context ctx);
 
 RS_LOADER_API int rs_loader_impl_destroy(loader_impl impl);
+
+RS_LOADER_API const char *get_attr_name(struct accessor_type *accessor);
 
 #ifdef __cplusplus
 }
