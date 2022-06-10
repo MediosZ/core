@@ -14,8 +14,18 @@ fn function_create(func: &Function, dlopen_library: &DlopenLibrary) -> FunctionC
     let name = func.name.clone();
     let args_count = func.args.len();
 
-    let function_ptr: unsafe fn() = unsafe { dlopen_library.instance.symbol(&name[..]) }.unwrap();
-    let function_impl = Box::into_raw(Box::new(function_ptr)) as OpaqueType;
+    let register_func_name = format!("metacall_register_fn_{}", name);
+    let register_func: unsafe fn() -> *mut class::NormalFunction =
+        unsafe { dlopen_library.instance.symbol(&register_func_name[..]) }.unwrap();
+    let function_impl = unsafe { register_func() } as OpaqueType;
+    // unsafe {
+    //     let nf_ptr = nf_impl as *mut class::NormalFunction;
+    //     let nf = Box::from_raw(nf_ptr);
+    //     let res = nf.invoke()
+    // }
+
+    // let function_ptr: unsafe fn() = unsafe { dlopen_library.instance.symbol(&name[..]) }.unwrap();
+    // let function_impl = Box::into_raw(Box::new(function_ptr)) as OpaqueType;
 
     FunctionCreate {
         name,
@@ -27,7 +37,7 @@ fn function_create(func: &Function, dlopen_library: &DlopenLibrary) -> FunctionC
 
 fn class_create(class: &Class, dlopen_library: &DlopenLibrary) -> ClassCreate {
     let name = class.name.clone();
-    let register_func_name = format!("matecall_register_class_{}", name);
+    let register_func_name = format!("metacall_register_class_{}", name);
     let register_func: unsafe fn() -> *mut class::Class =
         unsafe { dlopen_library.instance.symbol(&register_func_name[..]) }.unwrap();
     let class_impl = unsafe { register_func() } as OpaqueType;

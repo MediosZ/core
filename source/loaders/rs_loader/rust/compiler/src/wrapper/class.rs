@@ -394,6 +394,29 @@ impl ClassMethod {
     }
 }
 
+#[derive(Clone)]
+pub struct NormalFunction(TypeErasedFunction<MetacallValue>);
+
+impl NormalFunction {
+    pub fn new<F, Args>(f: F) -> Self
+    where
+        Args: FromMetaList + std::fmt::Debug,
+        F: Function<Args>,
+        F::Result: ToMetaResult + std::fmt::Debug,
+    {
+        Self(Arc::new(move |args: Vec<MetacallValue>| {
+            Args::from_meta_list(&args).and_then(|args| {
+                let res = f.invoke(args);
+                res.to_meta_result()
+            })
+        }))
+    }
+
+    pub fn invoke(&self, args: Vec<MetacallValue>) -> Result<MetacallValue> {
+        self.0(args)
+    }
+}
+
 pub trait ToMetaResult {
     fn to_meta_result(self) -> Result<MetacallValue>;
 }
@@ -1233,6 +1256,14 @@ mod tests {
                 123
             }
         }
+
+        fn test_func(x: i32) -> i32 {
+            x + 10
+        }
+
+        let nf = NormalFunction::new(test_func);
+        let nres = nf.invoke(vec![32 as MetacallValue]).unwrap();
+        println!("nres: {}", nres as i32);
         // register the class
         let foo_class = Class::builder::<Foo>()
             .set_constructor(Foo::new)

@@ -1,14 +1,10 @@
 use crate::wrapper::class::{Class, Instance};
 
 use super::*;
-use std::{
-    ffi::{c_void, CStr, CString},
-    os::raw::{c_char, c_int},
-};
+use std::{ffi::CStr, os::raw::c_int};
 #[repr(C)]
 pub struct ObjectInterface {
     create: extern "C" fn(OpaqueType, OpaqueType) -> c_int,
-
     get: extern "C" fn(OpaqueType, OpaqueType, OpaqueType) -> OpaqueType,
     set: extern "C" fn(OpaqueType, OpaqueType, OpaqueType, OpaqueType) -> c_int,
     method_invoke:
@@ -47,6 +43,7 @@ extern "C" fn object_singleton_set(
             .expect("Unable to get attr name");
         println!("object set attr: {}", name);
         obj.instance.set_attr(name, value, &class);
+
         std::mem::forget(class);
         std::mem::forget(obj);
         std::mem::forget(name);
@@ -69,6 +66,7 @@ extern "C" fn object_singleton_get(
             .expect("Unable to get attr name");
         println!("object get attr: {}", name);
         let ret = obj.instance.get_attr(name, &class);
+
         std::mem::forget(class);
         std::mem::forget(obj);
         std::mem::forget(name);
@@ -130,12 +128,12 @@ extern "C" fn object_singleton_destructor(_object: OpaqueType, object_impl: Opaq
         let object = Box::from_raw(object_impl_ptr);
         drop(object);
     }
-    println!("object destruct");
+    println!("destruct object");
     0
 }
 #[no_mangle]
 extern "C" fn object_singleton_destroy(_object: OpaqueType, _object_impl: OpaqueType) {
-    println!("object destroy");
+    println!("destroy object");
 }
 
 #[no_mangle]

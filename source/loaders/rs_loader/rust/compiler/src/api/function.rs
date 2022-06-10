@@ -5,7 +5,7 @@ use std::{
 };
 
 use super::*;
-
+use crate::wrapper::class;
 #[repr(C)]
 pub struct FunctionInterface {
     create: extern "C" fn(OpaqueType, OpaqueType) -> c_int,
@@ -35,11 +35,17 @@ extern "C" fn function_singleton_invoke(
     size: usize,
 ) -> OpaqueType {
     unsafe {
-        let func_ptr = Box::from_raw(func_impl as *mut unsafe fn());
-        let func: fn(OpaqueTypeList, usize) -> OpaqueType = std::mem::transmute_copy(&*func_ptr);
-        let result = func(args_p, size);
-        std::mem::forget(func_ptr);
-        result
+        // let func_ptr = Box::from_raw(func_impl as *mut unsafe fn());
+        // let func: fn(OpaqueTypeList, usize) -> OpaqueType = std::mem::transmute_copy(&*func_ptr);
+        // let result = func(args_p, size);
+        // std::mem::forget(func_ptr);
+        // result
+        let args = std::slice::from_raw_parts(args_p, size).to_vec();
+        let nf = Box::from_raw(func_impl as *mut class::NormalFunction);
+        let res = nf.invoke(args).unwrap();
+
+        std::mem::forget(nf);
+        res
     }
 }
 
@@ -60,7 +66,7 @@ extern "C" fn function_singleton_await(
 #[no_mangle]
 extern "C" fn function_singleton_destroy(_func: OpaqueType, func_impl: OpaqueType) {
     unsafe {
-        let func_ptr = Box::from_raw(func_impl as *mut OpaqueType);
+        let func_ptr = Box::from_raw(func_impl as *mut class::NormalFunction);
         drop(func_ptr);
     }
 }

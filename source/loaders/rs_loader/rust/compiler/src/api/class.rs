@@ -42,7 +42,6 @@ extern "C" fn class_singleton_constructor(
     size: usize,
 ) -> OpaqueType {
     println!("invoke class constructor");
-    // create a obj and return that
     unsafe {
         let class_impl_ptr = class_impl as *mut class::Class;
         let class = Box::from_raw(class_impl_ptr);
@@ -71,32 +70,11 @@ extern "C" fn class_singleton_static_set(
 #[no_mangle]
 extern "C" fn class_singleton_static_get(
     _klass: OpaqueType,
-    class_impl: OpaqueType,
-    accessor: OpaqueType,
+    _class_impl: OpaqueType,
+    _accessor: OpaqueType,
 ) -> OpaqueType {
     println!("class static get");
-    let ret = unsafe {
-        let class_impl_ptr = class_impl as *mut class::Class;
-        let class = Box::from_raw(class_impl_ptr);
-        let name = CStr::from_ptr(get_attr_name(accessor))
-            .to_str()
-            .expect("Unable to get attr name");
-        println!("get attr: {}", name);
-        // let args = std::slice::from_raw_parts(args_p, size).to_vec();
-        // let name = CStr::from_ptr(method_name(method))
-        //     .to_str()
-        //     .expect("Unable to get method name");
-        // let ret = class.call(name, args);
-        std::mem::forget(class);
-        std::mem::forget(name);
-        // ret
-        Err(1)
-    };
-    if let Ok(ret) = ret {
-        return ret;
-    } else {
-        return 0 as OpaqueType;
-    }
+    0 as OpaqueType
 }
 
 #[no_mangle]
@@ -187,8 +165,6 @@ pub fn register_class(class_registration: ClassRegistration) {
     } = class_registration.class_create;
     let name = CString::new(name).expect("Failed to convert function name to C string");
     // dbg!(&class_info);
-    // class_impl should be a Class instance. // class.init to create new instance
-    // Or it can be just Host? do we really need host?
     let class = unsafe { class_create(name.as_ptr(), 0, class_impl, singleton) };
 
     // register ctor:

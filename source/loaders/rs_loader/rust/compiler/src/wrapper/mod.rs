@@ -221,57 +221,104 @@ fn read_file(file_name: &str) -> std::io::Result<String> {
     Ok(ret)
 }
 
-static temp_class: &str = r#"#[no_mangle]
-unsafe fn matecall_register_class_Book() -> *mut Class {
-    let class = Class::builder::<Book>()
-        .set_constructor(Book::new)
-        .add_attribute_getter("price", |f| f.price)
-        .add_attribute_setter("price", |val, f| f.price = val)
-        .add_method("get_price", Book::get_price)
-        .add_class_method("get_number", Book::get_number)
-        .build();
-    Box::into_raw(Box::new(class))
+/*
+unsafe fn matecall_register_fn_add2() -> *mut NormalFunction {
+    let f = NormalFunction::new(add2);
+    Box::into_raw(Box::new(f))
 }
-"#;
+*/
+fn generate_function_wrapper(functions: &Vec<Function>) -> String {
+    let mut ret = String::new();
+    for func in functions {
+        ret.push_str(&format!(
+            "#[no_mangle]\nunsafe fn metacall_register_fn_{}() -> *mut NormalFunction {{\n",
+            func.name
+        ));
+        ret.push_str(&format!("\tlet f = NormalFunction::new({});\n", func.name));
+        ret.push_str("\tBox::into_raw(Box::new(f))\n}\n");
+    }
+    ret
+}
 
 fn generate_class_wrapper(classes: &Vec<crate::Class>) -> String {
     let mut ret = String::new();
-    ret.push_str("#[no_mangle]\npub unsafe fn register_all_classes(host_ptr: *mut Host){");
-    ret.push_str("let mut host = Box::from_raw(host_ptr);");
-    ret.push_str("std::mem::forget(host);");
-    ret.push_str("}");
+    for class in classes {
+        ret.push_str(&format!(
+            "#[no_mangle]\nunsafe fn metacall_register_class_{}() -> *mut Class {{\n",
+            class.name
+        ));
+        ret.push_str(&format!(
+            "\tlet class = Class::builder::<{}>()\n",
+            class.name
+        ));
+        // set constructor
+        if let Some(ctor) = &class.constructor {
+            ret.push_str(&format!("\t\t.set_constructor({}::new)\n", class.name));
+        } else {
+            println!("there's no constructor in class: {}", class.name);
+        }
+        // set attributes
+        for attr in &class.attributes {
+            ret.push_str(&format!(
+                "\t\t.add_attribute_getter(\"{}\", |f| f.{})\n",
+                attr.name, attr.name
+            ));
+            ret.push_str(&format!(
+                "\t\t.add_attribute_setter(\"{}\", |val, f| f.{} = val)\n",
+                attr.name, attr.name
+            ));
+        }
+        // set methods
+        for method in &class.methods {
+            ret.push_str(&format!(
+                "\t\t.add_method(\"{}\", {}::{})\n",
+                method.name, class.name, method.name
+            ));
+        }
+        // set static methods
+        for method in &class.static_methods {
+            ret.push_str(&format!(
+                "\t\t.add_class_method(\"{}\", {}::{})\n",
+                method.name, class.name, method.name
+            ));
+        }
+        // no need to set destructor
+        ret.push_str("\t\t.build();\n");
+        ret.push_str("\tBox::into_raw(Box::new(class))\n}\n");
+    }
     ret
 }
 
 pub fn generate_wrapper(callbacks: CompilerCallbacks) -> std::io::Result<CompilerCallbacks> {
-    let mut wrapped_functions: Vec<Function> = vec![];
+    // let mut wrapped_functions: Vec<Function> = vec![];
     let mut content = String::new();
 
     content.push_str(read_file("header.rs")?.as_str());
     content.push_str(read_file("class_mock.rs")?.as_str());
 
-    for func in callbacks.functions.iter() {
-        let wrapper_func = WrapperFunction::new(func);
-        let wrapper = wrapper_func.generate();
-        content.push_str(wrapper.as_str());
+    // for func in callbacks.functions.iter() {
+    //     let wrapper_func = WrapperFunction::new(func);
+    //     let wrapper = wrapper_func.generate();
+    //     content.push_str(wrapper.as_str());
 
-        let mut new_function = Function {
-            name: format!("metacall_{}", wrapper_func.name),
-            ret: None,
-            args: vec![],
-        };
-        if let Some(ret) = wrapper_func.ret {
-            new_function.ret = Some(ret.get_ret_type());
-        }
-        for arg in wrapper_func.args.iter() {
-            new_function.args.push(arg.get_args_type());
-        }
-        wrapped_functions.push(new_function);
-    }
+    //     let mut new_function = Function {
+    //         name: format!("metacall_{}", wrapper_func.name),
+    //         ret: None,
+    //         args: vec![],
+    //     };
+    //     if let Some(ret) = wrapper_func.ret {
+    //         new_function.ret = Some(ret.get_ret_type());
+    //     }
+    //     for arg in wrapper_func.args.iter() {
+    //         new_function.args.push(arg.get_args_type());
+    //     }
+    //     wrapped_functions.push(new_function);
+    // }
+    let function_wrapper = generate_function_wrapper(&callbacks.functions);
+    content.push_str(&function_wrapper);
     let class_wrapper = generate_class_wrapper(&callbacks.classes);
-    content.push_str(temp_class);
+    content.push_str(&class_wrapper);
     // dbg!(&class_wrapper);
-    // content.push_str(class_wrapper.as_str());
     match callbacks.source.input.0 {
         Input::File(input_path) => {
             // generate wrappers to a file source_wrapper.rs
@@ -293,7 +340,7 @@ pub fn generate_wrapper(callbacks: CompilerCallbacks) -> std::io::Result<Compile
             Ok(CompilerCallbacks {
                 source: Source::new(Source::File { path: source_path }),
                 is_parsing: false,
-                functions: wrapped_functions,
+                // functions: wrapped_functions,
                 ..callbacks
             })
         }
@@ -304,7 +351,7 @@ pub fn generate_wrapper(callbacks: CompilerCallbacks) -> std::io::Result<Compile
                     code: content + &input,
                 }),
                 is_parsing: false,
-                functions: wrapped_functions,
+                // functions: wrapped_functions,
                 ..callbacks
             }),
             _ => {

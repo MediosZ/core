@@ -394,8 +394,37 @@ impl ClassMethod {
     }
 }
 
+#[derive(Clone)]
+pub struct NormalFunction(TypeErasedFunction<MetacallValue>);
+
+impl NormalFunction {
+    pub fn new<F, Args>(f: F) -> Self
+    where
+        Args: FromMetaList + std::fmt::Debug,
+        F: Function<Args>,
+        F::Result: ToMetaResult + std::fmt::Debug,
+    {
+        Self(Arc::new(move |args: Vec<MetacallValue>| {
+            Args::from_meta_list(&args).and_then(|args| {
+                let res = f.invoke(args);
+                res.to_meta_result()
+            })
+        }))
+    }
+
+    pub fn invoke(&self, args: Vec<MetacallValue>) -> Result<MetacallValue> {
+        self.0(args)
+    }
+}
+
 pub trait ToMetaResult {
     fn to_meta_result(self) -> Result<MetacallValue>;
+}
+
+impl ToMetaResult for () {
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        Ok(unsafe { metacall_value_create_int(0) })
+    }
 }
 
 impl ToMetaResult for u32 {
@@ -406,9 +435,13 @@ impl ToMetaResult for u32 {
 
 impl ToMetaResult for i32 {
     fn to_meta_result(self) -> Result<MetacallValue> {
-        println!("to metacall res mock");
-        println!("{:?}", self);
         Ok(unsafe { metacall_value_create_int(self) })
+    }
+}
+
+impl ToMetaResult for f32 {
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        Ok(unsafe { metacall_value_create_float(self) })
     }
 }
 
@@ -437,6 +470,45 @@ impl FromMeta for i32 {
         Ok(unsafe { metacall_value_to_int(val) })
     }
 }
+
+impl FromMeta for f32 {
+    fn from_meta(val: MetacallValue) -> Result<Self> {
+        Ok(unsafe { metacall_value_to_float(val) })
+    }
+}
+
+impl<T> FromMeta for Vec<T>
+where
+    T: Clone + FromMeta,
+{
+    fn from_meta(val: MetacallValue) -> Result<Self> {
+        Ok(unsafe {
+            let arr = metacall_value_to_array(val);
+            let count = value_type_count(val);
+            let vec = std::slice::from_raw_parts(arr, count as usize)
+                .iter()
+                .map(|p| FromMeta::from_meta(*p).unwrap())
+                .collect::<Vec<T>>()
+                .clone();
+            vec
+        })
+    }
+}
+
+// impl FromMeta for &mut Vec<i32> {
+//     fn from_meta(val: MetacallValue) -> Result<Self> {
+//         Ok(unsafe {
+//             let arr = metacall_value_to_array(val);
+//             let count = value_type_count(val);
+//             let vec = std::slice::from_raw_parts(arr, count as usize)
+//                 .iter()
+//                 .map(|p| metacall_value_to_int(*p))
+//                 .collect::<Vec<i32>>();
+//             println!("{:?}", vec);
+//             vec
+//         })
+//     }
+// }
 
 // impl FromMetaList for (MetacallValue,) {
 //     fn from_meta_list(values: &[MetacallValue]) -> Result<Self, anyhow::Error> {
