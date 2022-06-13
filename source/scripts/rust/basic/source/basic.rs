@@ -28,10 +28,9 @@ fn add_float_vec(vec: Vec<f32>) -> f32 {
     vec.iter().sum()
 }
 
-// #[no_mangle]
-// pub fn return_vec() -> Vec<i32> {
-//     vec![1, 2, 3, 4, 5]
-// }
+fn return_vec() -> Vec<i32> {
+    vec![1, 2, 3, 4, 5]
+}
 
 // #[no_mangle]
 // pub fn return_map() -> HashMap<i32, f32> {
@@ -47,12 +46,10 @@ fn add_float_vec(vec: Vec<f32>) -> f32 {
 //     map.into_values().sum()
 // }
 
-// #[no_mangle]
 // pub fn string_len(s: String) -> usize {
 //     s.len()
 // }
 
-// #[no_mangle]
 // pub fn new_string(idx: i32) -> String {
 //     format!("get number {idx}")
 // }

@@ -5,6 +5,7 @@ use std::cell::Ref;
 use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::HashMap;
+// use std::ffi::CStr;
 use std::fmt;
 use std::ops::Deref;
 use std::os::raw::c_void;
@@ -343,6 +344,48 @@ impl Constructor {
 }
 
 #[derive(Clone)]
+pub struct AttributeGetter(Arc<dyn Fn(&Instance) -> Result<MetacallValue> + Send + Sync>);
+impl AttributeGetter {
+    pub fn new<T, F, R>(f: F) -> Self
+    where
+        T: 'static,
+        F: Fn(&T) -> R + Send + Sync + 'static,
+        R: ToMetaResult,
+    {
+        Self(Arc::new(move |receiver| {
+            let borrowed_receiver = receiver.borrow();
+            let receiver = Ok(borrowed_receiver.downcast_ref::<T>().unwrap());
+            receiver.map(&f).and_then(|v| v.to_meta_result())
+        }))
+    }
+
+    pub fn invoke(&self, receiver: &Instance) -> Result<MetacallValue> {
+        self.0(receiver)
+    }
+}
+
+#[derive(Clone)]
+pub struct AttributeSetter(Arc<dyn Fn(MetacallValue, &mut Instance)>);
+impl AttributeSetter {
+    pub fn new<T, F, Arg>(f: F) -> Self
+    where
+        T: 'static,
+        Arg: FromMeta,
+        F: Fn(Arg, &mut T) + 'static,
+    {
+        Self(Arc::new(move |value, receiver| {
+            let mut borrowed_receiver = receiver.borrow_mut();
+            let receiver = borrowed_receiver.downcast_mut::<T>().unwrap();
+            f(FromMeta::from_meta(value).unwrap(), receiver)
+        }))
+    }
+
+    pub fn invoke(&self, value: MetacallValue, receiver: &mut Instance) {
+        self.0(value, receiver)
+    }
+}
+
+#[derive(Clone)]
 pub struct InstanceMethod(TypeErasedMethod<MetacallValue>);
 
 impl InstanceMethod {
@@ -427,9 +470,21 @@ impl ToMetaResult for () {
     }
 }
 
-impl ToMetaResult for u32 {
+// impl ToMetaResult for u32 {
+//     fn to_meta_result(self) -> Result<MetacallValue> {
+//         Ok(self as MetacallValue)
+//     }
+// }
+
+impl ToMetaResult for i8 {
     fn to_meta_result(self) -> Result<MetacallValue> {
-        Ok(self as MetacallValue)
+        Ok(unsafe { metacall_value_create_char(self) })
+    }
+}
+
+impl ToMetaResult for i16 {
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        Ok(unsafe { metacall_value_create_short(self) })
     }
 }
 
@@ -439,12 +494,62 @@ impl ToMetaResult for i32 {
     }
 }
 
+impl ToMetaResult for i64 {
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        Ok(unsafe { metacall_value_create_long(self) })
+    }
+}
+
 impl ToMetaResult for f32 {
     fn to_meta_result(self) -> Result<MetacallValue> {
         Ok(unsafe { metacall_value_create_float(self) })
     }
 }
 
+impl ToMetaResult for f64 {
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        Ok(unsafe { metacall_value_create_double(self) })
+    }
+}
+
+impl ToMetaResult for String {
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        Ok(unsafe { metacall_value_create_string(self.as_ptr() as *const i8, self.len()) })
+    }
+}
+
+impl<T> ToMetaResult for Vec<T>
+where
+    T: Clone + ToMetaResult,
+{
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        let ret_vec = self
+            .into_iter()
+            .map(|val| val.to_meta_result().unwrap())
+            .collect::<Vec<*mut c_void>>();
+        Ok(unsafe { metacall_value_create_array(ret_vec.as_ptr(), ret_vec.len()) })
+    }
+}
+
+impl<K, V> ToMetaResult for HashMap<K, V>
+where
+    K: Clone + ToMetaResult,
+    V: Clone + ToMetaResult,
+{
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        unsafe {
+            let size = self.len();
+            let ret_map = self
+                .into_iter()
+                .map(|(key, val)| {
+                    let pair = vec![key.to_meta_result().unwrap(), val.to_meta_result().unwrap()];
+                    metacall_value_create_array(pair.as_ptr(), pair.len())
+                })
+                .collect::<Vec<*mut c_void>>();
+            Ok(metacall_value_create_map(ret_map.as_ptr(), size))
+        }
+    }
+}
 pub trait FromMetaList {
     fn from_meta_list(values: &[MetacallValue]) -> Result<Self>
     where
@@ -460,9 +565,20 @@ impl FromMeta for MetacallValue {
     }
 }
 
-impl FromMeta for u32 {
+// impl FromMeta for u32 {
+//     fn from_meta(val: MetacallValue) -> Result<Self> {
+//         Ok(val as u32)
+//     }
+// }
+
+impl FromMeta for i8 {
     fn from_meta(val: MetacallValue) -> Result<Self> {
-        Ok(val as u32)
+        Ok(unsafe { metacall_value_to_char(val) })
+    }
+}
+impl FromMeta for i16 {
+    fn from_meta(val: MetacallValue) -> Result<Self> {
+        Ok(unsafe { metacall_value_to_short(val) })
     }
 }
 impl FromMeta for i32 {
@@ -470,12 +586,28 @@ impl FromMeta for i32 {
         Ok(unsafe { metacall_value_to_int(val) })
     }
 }
-
+impl FromMeta for i64 {
+    fn from_meta(val: MetacallValue) -> Result<Self> {
+        Ok(unsafe { metacall_value_to_long(val) })
+    }
+}
 impl FromMeta for f32 {
     fn from_meta(val: MetacallValue) -> Result<Self> {
         Ok(unsafe { metacall_value_to_float(val) })
     }
 }
+impl FromMeta for f64 {
+    fn from_meta(val: MetacallValue) -> Result<Self> {
+        Ok(unsafe { metacall_value_to_double(val) })
+    }
+}
+
+// impl FromMeta for String {
+//     fn from_meta(val: MetacallValue) -> Result<Self> {
+//         let s = metacall_value_to_string(val);
+//         Ok(CStr::from_ptr(s).to_str().unwrap().to_owned())
+//     }
+// }
 
 impl<T> FromMeta for Vec<T>
 where
@@ -491,6 +623,29 @@ where
                 .collect::<Vec<T>>()
                 .clone();
             vec
+        })
+    }
+}
+
+impl<K, V> FromMeta for HashMap<K, V>
+where
+    K: Clone + FromMeta + std::cmp::Eq + std::hash::Hash,
+    V: Clone + FromMeta,
+{
+    fn from_meta(val: MetacallValue) -> Result<Self> {
+        Ok(unsafe {
+            let map = metacall_value_to_map(val);
+            let count = value_type_count(val);
+            let map = unsafe { std::slice::from_raw_parts(map, count as usize) };
+            let mut r_map: HashMap<K, V> = HashMap::new();
+            for map_value in map {
+                let m_pair = metacall_value_to_array(*map_value);
+                let m_pair = unsafe { std::slice::from_raw_parts(m_pair, 2) };
+                let key = FromMeta::from_meta(m_pair[0]).unwrap();
+                let val = FromMeta::from_meta(m_pair[1]).unwrap();
+                r_map.insert(key, val);
+            }
+            r_map
         })
     }
 }
@@ -1124,69 +1279,6 @@ impl<
 //         result
 //     }
 // }
-
-#[derive(Clone)]
-pub struct AttributeGetter(Arc<dyn Fn(&Instance) -> Result<MetacallValue> + Send + Sync>);
-impl AttributeGetter {
-    pub fn new<T, F, R>(f: F) -> Self
-    where
-        T: 'static,
-        F: Fn(&T) -> R + Send + Sync + 'static,
-        R: ToMetaResult,
-    {
-        Self(Arc::new(move |receiver| {
-            let borrowed_receiver = receiver.borrow();
-            let receiver = Ok(borrowed_receiver.downcast_ref::<T>().unwrap());
-            receiver.map(&f).and_then(|v| v.to_meta_result())
-        }))
-    }
-
-    pub fn invoke(&self, receiver: &Instance) -> Result<MetacallValue> {
-        self.0(receiver)
-    }
-}
-
-#[derive(Clone)]
-pub struct AttributeSetter(Arc<dyn Fn(MetacallValue, &mut Instance)>);
-impl AttributeSetter {
-    pub fn new<T, F, Arg>(f: F) -> Self
-    where
-        T: 'static,
-        Arg: FromMeta,
-        F: Fn(Arg, &mut T) + 'static,
-    {
-        Self(Arc::new(move |value, receiver| {
-            let mut borrowed_receiver = receiver.borrow_mut();
-            let receiver = borrowed_receiver.downcast_mut::<T>().unwrap();
-            f(FromMeta::from_meta(value).unwrap(), receiver)
-        }))
-    }
-
-    pub fn invoke(&self, value: MetacallValue, receiver: &mut Instance) {
-        self.0(value, receiver)
-    }
-}
-
-/*
-#[derive(Clone)]
-pub struct ClassMethod(TypeErasedFunction<MetacallValue>);
-
-impl ClassMethod {
-    pub fn new<F, Args>(f: F) -> Self
-    where
-        Args: FromMetaList,
-        F: Function<Args>,
-        F::Result: ToMetaResult,
-    {
-        Self(Arc::new(move |args: Vec<MetacallValue>| {
-            Args::from_meta_list(&args).and_then(|args| f.invoke(args).to_meta_result())
-        }))
-    }
-
-    pub fn invoke(&self, args: Vec<MetacallValue>) -> Result<MetacallValue> {
-        self.0(args)
-    }
-} */
 
 fn metaclass() -> Class {
     Class::builder::<Class>()

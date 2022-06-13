@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use std::cell::RefMut;
 use std::collections::HashMap;
 use std::fmt;
-use std::ops::Deref;
 use std::os::raw::c_void;
 use std::sync::Arc;
 
