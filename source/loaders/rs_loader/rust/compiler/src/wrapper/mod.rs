@@ -292,9 +292,10 @@ fn generate_class_wrapper(classes: &Vec<crate::Class>) -> String {
 pub fn generate_wrapper(callbacks: CompilerCallbacks) -> std::io::Result<CompilerCallbacks> {
     // let mut wrapped_functions: Vec<Function> = vec![];
     let mut content = String::new();
-
-    content.push_str(read_file("header.rs")?.as_str());
-    content.push_str(read_file("class_mock.rs")?.as_str());
+    // in order to solve the dependencies conflict,
+    // we use modules instead of putting them into a single file.
+    // content.push_str(read_file("header.rs")?.as_str());
+    // content.push_str(read_file("class_mock.rs")?.as_str());
 
     // for func in callbacks.functions.iter() {
     //     let wrapper_func = WrapperFunction::new(func);
@@ -330,8 +331,16 @@ pub fn generate_wrapper(callbacks: CompilerCallbacks) -> std::io::Result<Compile
                 .unwrap()
                 .to_owned();
             let _ = source_path.pop();
+            let wrapper_dir = PathBuf::from(WRAPPER_DIR.to_string());
+            // std::fs::copy(wrapper_dir.join("header.rs"), source_path.join("header.rs"))?;
+            std::fs::copy(
+                wrapper_dir.join("class_mock.rs"),
+                source_path.join("class_mock.rs"),
+            )?;
+
             source_path.push("wrapped_".to_owned() + &source_file);
             let mut wrapper_file = File::create(&source_path)?;
+            wrapper_file.write_all(b"mod class_mock;\nuse class_mock::*;")?;
             wrapper_file.write_all(content.as_bytes())?;
             let dst = format!("include!({:?});", callbacks.source.input_path.clone());
             wrapper_file.write_all(dst.as_bytes())?;
