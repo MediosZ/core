@@ -66,7 +66,6 @@ TEST_F(metacall_rust_class_test, DefaultConstructor)
 		metacall_value_destroy(ret_value);
 		// metacall_value_destroy(book_class);
 	}
-
 	{
 		void *book_class = metacall_class("Book");
 		ASSERT_NE((void *)NULL, (void *)book_class);

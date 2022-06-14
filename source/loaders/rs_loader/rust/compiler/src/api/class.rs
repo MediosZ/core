@@ -4,7 +4,7 @@ use crate::wrapper::class;
 use crate::Class;
 
 use std::{
-    ffi::{c_void, CStr, CString},
+    ffi::{CStr, CString},
     os::raw::{c_char, c_int},
 };
 #[repr(C)]
@@ -154,7 +154,6 @@ pub struct ClassRegistration {
 }
 
 pub fn register_class(class_registration: ClassRegistration) {
-    println!("register my class!");
     let sp = unsafe { context_scope(class_registration.ctx) };
 
     let ClassCreate {

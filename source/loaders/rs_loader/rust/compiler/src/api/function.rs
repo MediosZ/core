@@ -1,8 +1,4 @@
-use std::{
-    ffi::{c_void, CString},
-    os::raw::{c_char, c_int},
-    path::PathBuf,
-};
+use std::{ffi::CString, os::raw::c_int};
 
 use super::*;
 use crate::wrapper::class;

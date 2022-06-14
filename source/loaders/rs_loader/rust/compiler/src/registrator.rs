@@ -1,13 +1,8 @@
-use std::ffi::c_void;
-
 use crate::api::{
     class_singleton, function_singleton, register_class, register_function, ClassCreate,
     ClassRegistration, FunctionCreate, FunctionInputSignature, FunctionRegistration, OpaqueType,
 };
-
 use crate::wrapper::class;
-
-// use dlopen::raw::Library as DlopenLibrary;
 use crate::{Class, CompilerState, DlopenLibrary, Function};
 
 fn function_create(func: &Function, dlopen_library: &DlopenLibrary) -> FunctionCreate {
@@ -18,15 +13,6 @@ fn function_create(func: &Function, dlopen_library: &DlopenLibrary) -> FunctionC
     let register_func: unsafe fn() -> *mut class::NormalFunction =
         unsafe { dlopen_library.instance.symbol(&register_func_name[..]) }.unwrap();
     let function_impl = unsafe { register_func() } as OpaqueType;
-    // unsafe {
-    //     let nf_ptr = nf_impl as *mut class::NormalFunction;
-    //     let nf = Box::from_raw(nf_ptr);
-    //     let res = nf.invoke()
-    // }
-
-    // let function_ptr: unsafe fn() = unsafe { dlopen_library.instance.symbol(&name[..]) }.unwrap();
-    // let function_impl = Box::into_raw(Box::new(function_ptr)) as OpaqueType;
-
     FunctionCreate {
         name,
         args_count,
@@ -35,27 +21,12 @@ fn function_create(func: &Function, dlopen_library: &DlopenLibrary) -> FunctionC
     }
 }
 
-// we can call a function using
-// value ret = (value)function_call(value_to_function(val), value_args, args_size);
-
 fn class_create(class: &Class, dlopen_library: &DlopenLibrary) -> ClassCreate {
     let name = class.name.clone();
     let register_func_name = format!("metacall_register_class_{}", name);
     let register_func: unsafe fn() -> *mut class::Class =
         unsafe { dlopen_library.instance.symbol(&register_func_name[..]) }.unwrap();
     let class_impl = unsafe { register_func() } as OpaqueType;
-    // unsafe {
-    //     let class_impl_ptr = class_impl as *mut class::Class;
-    //     let class = Box::from_raw(class_impl_ptr);
-    //     let instance = class.init(vec![12 as OpaqueType]);
-    //     let x = instance.get_attr("price", &class).unwrap();
-    //     dbg!(x as u32);
-    //     // let res = instance.call("x_plus_y", vec![10 as MetacallValue], &class)?;
-    //     let num = class.call("get_number", vec![]).unwrap();
-    //     println!("get_number: {}", num as u32);
-    //     std::mem::forget(class);
-    // }
-
     ClassCreate {
         name,
         class_impl,

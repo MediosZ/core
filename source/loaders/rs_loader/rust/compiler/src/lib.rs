@@ -303,7 +303,7 @@ pub struct Class {
     methods: Vec<Function>,
     static_methods: Vec<Function>,
     attributes: Vec<Attribute>,
-    static_attributes: Vec<Attribute>, // we don't handle static attrs in rust
+    // static_attributes: Vec<Attribute>, // we don't handle static attrs in rust
 }
 #[derive(Clone, Debug)]
 pub struct CompilerState {

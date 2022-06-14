@@ -1,4 +1,3 @@
-use crate::wrapper::class::Host;
 use std::{
     ffi::{c_void, CString},
     os::raw::{c_char, c_int},
@@ -18,18 +17,13 @@ pub use class::{class_singleton, register_class, ClassCreate, ClassRegistration}
 
 pub struct LoaderLifecycleState {
     pub execution_paths: Vec<PathBuf>,
-    pub host: Host,
 }
 impl LoaderLifecycleState {
     pub fn new(execution_paths: Vec<PathBuf>) -> LoaderLifecycleState {
-        LoaderLifecycleState {
-            execution_paths,
-            host: Host::new(),
-        }
+        LoaderLifecycleState { execution_paths }
     }
 }
 extern "C" {
-    pub fn metacall_value_create_int(i: c_int) -> *mut c_void;
     fn loader_impl_get(loader_impl: OpaqueType) -> OpaqueType;
 
     fn loader_initialization_register(loader_impl: OpaqueType);
@@ -94,7 +88,7 @@ extern "C" {
         visibility: c_int,
         singleton: OpaqueType,
     ) -> OpaqueType;
-    fn class_register_static_attribute(class: OpaqueType, attr: OpaqueType) -> c_int;
+    // fn class_register_static_attribute(class: OpaqueType, attr: OpaqueType) -> c_int;
     fn class_register_attribute(class: OpaqueType, attr: OpaqueType) -> c_int;
     fn get_attr_name(attr: OpaqueType) -> *mut c_char;
     fn method_create(
