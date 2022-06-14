@@ -501,6 +501,18 @@ impl ToMetaResult for () {
 //     }
 // }
 
+impl ToMetaResult for bool {
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        Ok(unsafe { metacall_value_create_bool(self as i32) })
+    }
+}
+
+impl ToMetaResult for char {
+    fn to_meta_result(self) -> Result<MetacallValue> {
+        Ok(unsafe { metacall_value_create_char(self as i8) })
+    }
+}
+
 impl ToMetaResult for usize {
     fn to_meta_result(self) -> Result<MetacallValue> {
         println!("get usize: {self}");
@@ -603,6 +615,16 @@ impl FromMeta for MetacallValue {
 //         Ok(val as u32)
 //     }
 // }
+impl FromMeta for bool {
+    fn from_meta(val: MetacallValue) -> Result<Self> {
+        Ok(unsafe { metacall_value_to_bool(val) as bool })
+    }
+}
+impl FromMeta for char {
+    fn from_meta(val: MetacallValue) -> Result<Self> {
+        Ok(unsafe { metacall_value_to_char(val) as char })
+    }
+}
 
 impl FromMeta for i8 {
     fn from_meta(val: MetacallValue) -> Result<Self> {

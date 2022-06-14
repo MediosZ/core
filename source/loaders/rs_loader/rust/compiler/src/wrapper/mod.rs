@@ -221,12 +221,6 @@ fn read_file(file_name: &str) -> std::io::Result<String> {
     Ok(ret)
 }
 
-/*
-unsafe fn matecall_register_fn_add2() -> *mut NormalFunction {
-    let f = NormalFunction::new(add2);
-    Box::into_raw(Box::new(f))
-}
-*/
 fn generate_function_wrapper(functions: &Vec<Function>) -> String {
     let mut ret = String::new();
     for func in functions {

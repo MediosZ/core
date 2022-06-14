@@ -35,6 +35,9 @@ fn function_create(func: &Function, dlopen_library: &DlopenLibrary) -> FunctionC
     }
 }
 
+// we can call a function using
+// value ret = (value)function_call(value_to_function(val), value_args, args_size);
+
 fn class_create(class: &Class, dlopen_library: &DlopenLibrary) -> ClassCreate {
     let name = class.name.clone();
     let register_func_name = format!("metacall_register_class_{}", name);
